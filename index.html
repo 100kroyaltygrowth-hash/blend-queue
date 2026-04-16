@@ -211,6 +211,18 @@
   .scroll-area::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
   .section-label { font-family:'Barlow Condensed',sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:12px; }
+
+  /* SIZE / LEVEL SELECTOR */
+  .option-selector { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .option-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:1px; text-transform:uppercase; padding:5px 14px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.15s; }
+  .option-btn.selected { background:var(--orange); border-color:var(--orange); color:#fff; }
+  .option-btn:hover:not(.selected) { border-color:var(--cream-dim); color:var(--cream); }
+
+  /* QUEUE OPTION TAGS */
+  .tag-size { background:rgba(232,97,10,0.2); border:1px solid var(--orange-dim); color:var(--orange); font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
+  .tag-level-sparked { background:rgba(76,175,110,0.15); border:1px solid #3a8a50; color:#4caf6e; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
+  .tag-level-lit     { background:rgba(240,180,41,0.15); border:1px solid #a07010; color:#f0b429; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
+  .tag-level-loaded  { background:rgba(224,80,80,0.15); border:1px solid #a03030; color:#e05050; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
 </style>
 </head>
 <body>
@@ -302,12 +314,33 @@
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
     <input type="text" class="search-input" id="manualCustomerName" placeholder="Customer name (optional)" style="max-width:220px;">
     <div style="flex:1;min-width:200px;">
-      <select class="form-input" id="recipeSelect">
+      <select class="form-input" id="recipeSelect" onchange="onRecipeSelectChange()">
         <option value="">— Select a recipe —</option>
       </select>
     </div>
     <button class="btn btn-secondary btn-sm" onclick="addManualRecipe()">+ Add</button>
   </div>
+
+  <!-- SIZE selector (shakes) -->
+  <div id="sizeSelector" style="display:none;margin-bottom:12px;">
+    <div class="form-label">Size</div>
+    <div class="option-selector">
+      <button class="option-btn selected" onclick="selectOption('size','16oz',this)">16oz</button>
+      <button class="option-btn" onclick="selectOption('size','24oz',this)">24oz</button>
+      <button class="option-btn" onclick="selectOption('size','32oz',this)">32oz</button>
+    </div>
+  </div>
+
+  <!-- LEVEL selector (teas) -->
+  <div id="levelSelector" style="display:none;margin-bottom:12px;">
+    <div class="form-label">Level</div>
+    <div class="option-selector">
+      <button class="option-btn selected" onclick="selectOption('level','Sparked',this)">Sparked</button>
+      <button class="option-btn" onclick="selectOption('level','Lit',this)">Lit</button>
+      <button class="option-btn" onclick="selectOption('level','Loaded',this)">Loaded</button>
+    </div>
+  </div>
+
   <div id="manualOrder" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:16px;"></div>
   <button class="btn btn-primary" onclick="submitManualOrder()" style="width:100%;">📤 Send to Kitchen Queue</button>
 </div>
@@ -675,10 +708,13 @@ async function parseWithClaude(text) {
 
 Available recipes: ${recipeNames}
 
+Shakes come in sizes: 16oz, 24oz, 32oz (default 16oz if not mentioned).
+Teas come in levels: Sparked, Lit, Loaded (default Sparked if not mentioned).
+
 Spoken order: "${text}"
 
 Respond ONLY with valid JSON (no markdown):
-{"customerName": "Name or null", "items": ["Exact Recipe Name 1", "Exact Recipe Name 2"]}`
+{"customerName": "Name or null", "items": [{"name": "Exact Recipe Name", "size": "16oz or null", "level": "Sparked or null"}]}`
         }]
       })
     });
@@ -687,6 +723,7 @@ Respond ONLY with valid JSON (no markdown):
     try { parsed = JSON.parse(data.content[0].text.trim()); } catch {}
     document.getElementById('aiThinking').classList.remove('show');
     buildOrderFromParsed(parsed.customerName, parsed.items || []);
+    // items may be array of strings or array of objects — both handled in buildOrderFromParsed
   } catch(err) {
     document.getElementById('aiThinking').classList.remove('show');
     toast('Claude error — using keyword match', 'error');
@@ -702,18 +739,40 @@ function parseWithKeywords(text) {
   );
   const forMatch = text.match(/for\s+([A-Z][a-z]+)/);
   const customerName = forMatch ? forMatch[1] : null;
+  // Try to extract size/level from spoken text
+  const items = matched.map(r => {
+    const item = { name: r.name };
+    if (r.category === 'shake') {
+      item.size = lower.includes('32') ? '32oz' : lower.includes('24') ? '24oz' : '16oz';
+    }
+    if (r.category === 'tea') {
+      item.level = lower.includes('loaded') ? 'Loaded' : lower.includes('lit') ? 'Lit' : 'Sparked';
+    }
+    return item;
+  });
   document.getElementById('aiThinking').classList.remove('show');
-  buildOrderFromParsed(customerName, matched.map(r => r.name));
+  buildOrderFromParsed(customerName, items);
 }
 
-function buildOrderFromParsed(customerName, itemNames) {
-  if (!itemNames.length) { toast('No recipes matched. Try again or add manually.', 'error'); return; }
-  const resolvedItems = itemNames.map(name =>
-    recipes.find(r => r.name.toLowerCase() === name.toLowerCase()) ||
-    recipes.find(r => r.name.toLowerCase().includes(name.toLowerCase().slice(0, 5)))
-  ).filter(Boolean);
+function buildOrderFromParsed(customerName, itemsRaw) {
+  if (!itemsRaw.length) { toast('No recipes matched. Try again or add manually.', 'error'); return; }
+  const resolvedItems = itemsRaw.map(raw => {
+    const nameStr = typeof raw === 'string' ? raw : raw.name;
+    const r = recipes.find(r => r.name.toLowerCase() === nameStr.toLowerCase()) ||
+              recipes.find(r => r.name.toLowerCase().includes(nameStr.toLowerCase().slice(0, 5)));
+    if (!r) return null;
+    const item = { id: r.id, name: r.name, category: r.category };
+    if (typeof raw === 'object') {
+      if (raw.size  && r.category === 'shake') item.size  = raw.size;
+      if (raw.level && r.category === 'tea')   item.level = raw.level;
+    }
+    // defaults
+    if (r.category === 'shake' && !item.size)  item.size  = '16oz';
+    if (r.category === 'tea'   && !item.level) item.level = 'Sparked';
+    return item;
+  }).filter(Boolean);
   if (!resolvedItems.length) { toast('Could not match recipes. Add manually.', 'error'); return; }
-  pushOrder(customerName || 'Guest', resolvedItems.map(r => ({ id: r.id, name: r.name })));
+  pushOrder(customerName || 'Guest', resolvedItems);
   document.getElementById('voicePreview').classList.remove('show');
 }
 
@@ -740,22 +799,54 @@ function pushOrder(customerName, items) {
 // ──────────────────────────────────────────────
 // MANUAL ORDER
 // ──────────────────────────────────────────────
+let selectedSize  = '16oz';
+let selectedLevel = 'Sparked';
+
+function selectOption(type, value, btn) {
+  if (type === 'size')  selectedSize  = value;
+  if (type === 'level') selectedLevel = value;
+  // Update button states in that group
+  btn.closest('.option-selector').querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function onRecipeSelectChange() {
+  const id = document.getElementById('recipeSelect').value;
+  const r  = recipes.find(r => r.id === id);
+  const sizeSel  = document.getElementById('sizeSelector');
+  const levelSel = document.getElementById('levelSelector');
+  sizeSel.style.display  = 'none';
+  levelSel.style.display = 'none';
+  if (!r) return;
+  if (r.category === 'shake') sizeSel.style.display  = 'block';
+  if (r.category === 'tea')   levelSel.style.display = 'block';
+}
+
 function addManualRecipe() {
   const sel = document.getElementById('recipeSelect');
-  const id = sel.value;
+  const id  = sel.value;
   if (!id) return;
   const r = recipes.find(r => r.id === id);
   if (!r || manualOrderItems.find(i => i.id === id)) { toast('Already in order', 'error'); return; }
-  manualOrderItems.push({ id: r.id, name: r.name });
+  const item = { id: r.id, name: r.name, category: r.category };
+  if (r.category === 'shake') item.size  = selectedSize;
+  if (r.category === 'tea')   item.level = selectedLevel;
+  manualOrderItems.push(item);
   renderManualOrderItems();
+  // Reset selectors
+  document.getElementById('sizeSelector').style.display  = 'none';
+  document.getElementById('levelSelector').style.display = 'none';
+  sel.value = '';
 }
 function renderManualOrderItems() {
-  document.getElementById('manualOrder').innerHTML = manualOrderItems.map(item =>
-    `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;">
-      <span>${item.name}</span>
-      <span onclick="removeManualItem('${item.id}')" style="cursor:pointer;color:var(--text-dim);font-size:16px;">×</span>
-    </div>`
-  ).join('');
+  document.getElementById('manualOrder').innerHTML = manualOrderItems.map(item => {
+    const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
+                   item.level ? `<span class="tag-level-${item.level.toLowerCase()}">${item.level}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;">
+      <span>${item.name}</span>${optTag}
+      <span onclick="removeManualItem('${item.id}')" style="cursor:pointer;color:var(--text-dim);font-size:16px;margin-left:2px;">×</span>
+    </div>`;
+  }).join('');
 }
 function removeManualItem(id) {
   manualOrderItems = manualOrderItems.filter(i => i.id !== id);
@@ -794,8 +885,10 @@ function renderQueue() {
           <div class="queue-name">${order.customerName}</div>
           ${order.items.map(item => {
             const r = recipes.find(r => r.id === item.id);
-            if (!r) return '<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title">' + item.name + '</div><div style="font-size:12px;color:var(--text-dim);">Recipe not found in library</div></div>';
-            return '<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title">' + r.name + '</div><div class="ingredient-list">' + (r.ingredients||[]).map(i => '<span class="ingredient">' + i + '</span>').join('') + '</div>' + (r.instructions ? '<div class="recipe-step">' + r.instructions + '</div>' : '') + '</div>';
+            const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
+                           item.level ? `<span class="tag-level-${(item.level||'').toLowerCase()}">${item.level}</span>` : '';
+            if (!r) return '<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title">' + item.name + ' ' + (optTag||'') + '</div><div style="font-size:12px;color:var(--text-dim);">Recipe not found in library</div></div>';
+            return `<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title" style="display:flex;align-items:center;gap:8px;">${r.name} ${optTag}</div><div class="ingredient-list">${(r.ingredients||[]).map(i => '<span class="ingredient">' + i + '</span>').join('')}</div>${r.instructions ? '<div class="recipe-step">' + r.instructions + '</div>' : ''}</div>`;
           }).join('')}
         </div>
         <div class="queue-actions">
