@@ -212,6 +212,44 @@
 
   .section-label { font-family:'Barlow Condensed',sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:12px; }
 
+  /* RECIPE SEARCH + DROPDOWN */
+  .recipe-search-wrap { position:relative; flex:1; min-width:220px; }
+  .recipe-search-row { display:flex; gap:0; }
+  .recipe-search-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-right:none; border-radius:var(--radius) 0 0 var(--radius); padding:10px 14px; color:var(--text); font-family:'Barlow',sans-serif; font-size:14px; outline:none; transition:border-color 0.2s; width:100%; }
+  .recipe-search-input:focus { border-color:var(--orange); }
+  .recipe-search-input::placeholder { color:var(--text-dim); }
+  .recipe-dropdown-btn { background:var(--surface2); border:1px solid var(--border); border-left:1px solid var(--border); border-radius:0 var(--radius) var(--radius) 0; padding:0 12px; cursor:pointer; color:var(--text-dim); font-size:14px; transition:all 0.2s; white-space:nowrap; }
+  .recipe-dropdown-btn:hover { background:var(--surface3); color:var(--cream); }
+  .autocomplete-list { position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--orange-dim); border-top:none; border-radius:0 0 var(--radius) var(--radius); z-index:150; max-height:260px; overflow-y:auto; display:none; box-shadow:0 8px 24px rgba(0,0,0,0.4); }
+  .autocomplete-list.open { display:block; }
+  .ac-search-header { padding:8px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:11px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .autocomplete-item { padding:10px 14px; cursor:pointer; font-size:14px; color:var(--cream-dim); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); transition:background 0.1s; }
+  .autocomplete-item:last-child { border-bottom:none; }
+  .autocomplete-item:hover, .autocomplete-item.highlighted { background:var(--surface2); color:var(--cream); }
+  .autocomplete-item .ac-cat { font-size:11px; color:var(--text-dim); background:var(--surface3); padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:1px; flex-shrink:0; margin-left:8px; }
+  .ac-empty { padding:12px 14px; font-size:13px; color:var(--text-dim); font-style:italic; }
+
+  /* FREQUENT / RECENT RECIPE BUTTONS */
+  .quick-section { margin-bottom:20px; }
+  .quick-section-label { font-family:'Barlow Condensed',sans-serif; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px; font-weight:700; }
+  .quick-btns { display:flex; flex-wrap:wrap; gap:6px; }
+  .quick-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.5px; padding:7px 14px; border-radius:20px; border:1px solid var(--border); background:var(--surface2); color:var(--cream-dim); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .quick-btn:hover { border-color:var(--orange); color:var(--cream); background:var(--orange-glow); }
+  .quick-btn.tea-btn   { border-color:#3a8a50; }
+  .quick-btn.shake-btn { border-color:var(--orange-dim); }
+
+  /* LAST ORDER REPEAT */
+  .last-order-bar { display:flex; align-items:center; justify-content:space-between; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:16px; }
+  .last-order-label { font-size:12px; color:var(--text-dim); }
+  .last-order-items { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; color:var(--cream-dim); }
+
+  /* CUSTOMER NAME AUTOCOMPLETE */
+  .name-wrap { position:relative; max-width:220px; }
+  .name-autocomplete { position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--orange-dim); border-top:none; border-radius:0 0 var(--radius) var(--radius); z-index:50; display:none; }
+  .name-autocomplete.open { display:block; }
+  .name-ac-item { padding:8px 14px; cursor:pointer; font-size:13px; color:var(--cream-dim); transition:background 0.1s; }
+  .name-ac-item:hover { background:var(--surface2); color:var(--cream); }
+
   /* SIZE / LEVEL SELECTOR */
   .option-selector { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   .option-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:1px; text-transform:uppercase; padding:5px 14px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.15s; }
@@ -231,9 +269,10 @@
 <nav class="nav">
   <div class="nav-logo">BLEND <span>QUEUE</span></div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('order', this)">📋 New Order</button>
+    <button class="nav-tab active" onclick="showPage('order', this)">🎙️ Voice</button>
+    <button class="nav-tab" onclick="showPage('quick', this)">⚡ Quick Order</button>
     <button class="nav-tab" onclick="showPage('queue', this)">
-      Kitchen Queue<span class="badge" id="queueBadge">0</span>
+      🍹 Queue<span class="badge" id="queueBadge">0</span>
     </button>
     <button class="nav-tab" onclick="showPage('recipes', this)">🗂️ Recipes</button>
     <button class="nav-tab" onclick="showPage('dashboard', this)">📊 Dashboard</button>
@@ -321,16 +360,26 @@
     </div>
   </div>
 
-  <!-- MANUAL -->
+  <!-- MANUAL ADD (on voice page) -->
   <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:14px;">Or Build Manually</div>
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-    <input type="text" class="search-input" id="manualCustomerName" placeholder="Customer name (optional)" style="max-width:220px;">
-    <div style="flex:1;min-width:200px;">
-      <select class="form-input" id="recipeSelect" onchange="onRecipeSelectChange()">
-        <option value="">— Select a recipe —</option>
-      </select>
+
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-start;">
+    <div class="name-wrap">
+      <input type="text" class="search-input" id="manualCustomerName" placeholder="Customer name" autocomplete="off" oninput="onNameInput('manualCustomerName','nameAC1')" onblur="hideAC('nameAC1')">
+      <div class="name-autocomplete" id="nameAC1"></div>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="addManualRecipe()">+ Add</button>
+    <div class="recipe-search-wrap">
+      <div class="recipe-search-row">
+        <input type="text" class="recipe-search-input" id="recipeSearchInput" placeholder="Search or browse recipes..." autocomplete="off"
+          oninput="onRecipeSearch('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
+          onkeydown="onACKeydown(event,'recipeAC1')"
+          onfocus="openDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
+          onblur="hideACDelayed('recipeAC1')">
+        <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')">▾</button>
+      </div>
+      <div class="autocomplete-list" id="recipeAC1"></div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="addManualRecipe()" style="white-space:nowrap;">+ Add</button>
   </div>
 
   <!-- SIZE selector (shakes) -->
@@ -355,6 +404,85 @@
 
   <div id="manualOrder" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:16px;"></div>
   <button class="btn btn-primary" onclick="submitManualOrder()" style="width:100%;">📤 Send to Kitchen Queue</button>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: QUICK ORDER                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="page" id="page-quick">
+  <div class="section-header">
+    <div class="section-title">Quick <span>Order</span></div>
+  </div>
+
+  <!-- LAST ORDER REPEAT -->
+  <div id="lastOrderBar" style="display:none;" class="last-order-bar">
+    <div>
+      <div class="last-order-label">🔁 REPEAT LAST ORDER</div>
+      <div class="last-order-items" id="lastOrderItems"></div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="repeatLastOrder()">Repeat</button>
+  </div>
+
+  <!-- FREQUENT RECIPES -->
+  <div class="quick-section">
+    <div class="quick-section-label">⚡ Frequent</div>
+    <div class="quick-btns" id="frequentBtns">
+      <div style="font-size:13px;color:var(--text-dim);">Order history will populate these</div>
+    </div>
+  </div>
+
+  <!-- RECENT RECIPES -->
+  <div class="quick-section">
+    <div class="quick-section-label">🕐 Recently Ordered</div>
+    <div class="quick-btns" id="recentBtns">
+      <div style="font-size:13px;color:var(--text-dim);">No recent orders yet</div>
+    </div>
+  </div>
+
+  <div style="height:1px;background:var(--border);margin:4px 0 20px;"></div>
+
+  <!-- CUSTOMER NAME + SEARCH -->
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-start;">
+    <div class="name-wrap">
+      <input type="text" class="search-input" id="quickCustomerName" placeholder="Customer name" autocomplete="off" oninput="onNameInput('quickCustomerName','nameAC2')" onblur="hideAC('nameAC2')">
+      <div class="name-autocomplete" id="nameAC2"></div>
+    </div>
+    <div class="recipe-search-wrap">
+      <div class="recipe-search-row">
+        <input type="text" class="recipe-search-input" id="quickRecipeSearch" placeholder="Search or browse recipes..." autocomplete="off"
+          oninput="onRecipeSearch('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
+          onkeydown="onACKeydown(event,'recipeAC2')"
+          onfocus="openDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
+          onblur="hideACDelayed('recipeAC2')">
+        <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')">▾</button>
+      </div>
+      <div class="autocomplete-list" id="recipeAC2"></div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="addQuickRecipe()" style="white-space:nowrap;">+ Add</button>
+  </div>
+
+  <!-- SIZE selector -->
+  <div id="quickSizeSelector" style="display:none;margin-bottom:12px;">
+    <div class="form-label">Size</div>
+    <div class="option-selector">
+      <button class="option-btn selected" onclick="selectQuickOption('size','16oz',this)">16oz</button>
+      <button class="option-btn" onclick="selectQuickOption('size','24oz',this)">24oz</button>
+      <button class="option-btn" onclick="selectQuickOption('size','32oz',this)">32oz</button>
+    </div>
+  </div>
+
+  <!-- LEVEL selector -->
+  <div id="quickLevelSelector" style="display:none;margin-bottom:12px;">
+    <div class="form-label">Level</div>
+    <div class="option-selector">
+      <button class="option-btn selected" onclick="selectQuickOption('level','Sparked',this)">Sparked</button>
+      <button class="option-btn" onclick="selectQuickOption('level','Lit',this)">Lit</button>
+      <button class="option-btn" onclick="selectQuickOption('level','Loaded',this)">Loaded</button>
+    </div>
+  </div>
+
+  <div id="quickOrder" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:16px;"></div>
+  <button class="btn btn-primary" onclick="submitQuickOrder()" style="width:100%;">📤 Send to Kitchen Queue</button>
 </div>
 
 <!-- ══════════════════════════════════════════ -->
@@ -433,6 +561,13 @@
   </div>
   <div class="section-title" style="font-size:20px;margin-bottom:16px;">Completed <span>Orders</span></div>
   <div class="completed-list" id="dashCompleted"></div>
+
+  <div style="height:1px;background:var(--border);margin:28px 0 20px;"></div>
+  <div class="section-title" style="font-size:20px;margin-bottom:16px;">Customer <span>Database</span></div>
+  <div style="margin-bottom:12px;">
+    <input type="text" class="search-input" id="customerSearch" placeholder="Search customers..." oninput="filterCustomers()" style="max-width:300px;">
+  </div>
+  <div id="customerList"></div>
 </div>
 
 <!-- ══════════════════════════════════════════ -->
@@ -563,9 +698,10 @@
 // ──────────────────────────────────────────────
 // STATE
 // ──────────────────────────────────────────────
-let recipes       = [];
-let activeOrders  = {};   // Firebase snapshot: {orderId: orderObj}
-let completedOrders = {}; // Firebase snapshot
+let recipes         = [];
+let activeOrders    = {};   // Firebase snapshot: {orderId: orderObj}
+let completedOrders = {};   // Firebase snapshot
+let customerDB      = [];   // Firebase customer records
 let manualOrderItems = [];
 let currentViewRecipeId = null;
 let apiKey        = localStorage.getItem('blendApiKey') || '';
@@ -666,11 +802,17 @@ function initFirebase(cfg) {
         recipes = Object.values(val);
       } else {
         recipes = [];
-        seedDefaultRecipes(); // seed only if empty
+        seedDefaultRecipes();
       }
       if (document.getElementById('page-recipes').classList.contains('active')) renderRecipes();
       populateRecipeSelect();
       document.getElementById('statRecipes').textContent = recipes.length;
+    });
+
+    // Listen: customers
+    db.ref('customers').on('value', snap => {
+      const val = snap.val();
+      customerDB = val ? Object.values(val) : [];
     });
 
   } catch(err) {
@@ -718,6 +860,7 @@ function showPage(name, btn) {
   if (name === 'queue')     renderQueue();
   if (name === 'recipes')   renderRecipes();
   if (name === 'dashboard') renderDashboard();
+  if (name === 'quick')     renderQuickPage();
 }
 
 // ──────────────────────────────────────────────
@@ -841,45 +984,73 @@ Respond ONLY with valid JSON (no markdown):
 }
 
 function parseWithKeywords(text) {
+  if (!recipes || recipes.length === 0) {
+    document.getElementById('aiThinking').classList.remove('show');
+    toast('Recipes still loading — try again in a moment', 'error');
+    return;
+  }
+
   const lower = text.toLowerCase();
+  const stopWords = new Set(['a','an','the','and','with','for','me','my','please','can','i','want','get','have','one','two','three','make','order','need','id','like','ill','could']);
+  const spokenWords = lower.split(/\s+/).map(w => w.replace(/[^a-z0-9]/g,'')).filter(w => w.length > 1 && !stopWords.has(w));
 
-  // Fuzzy match: spoken words against recipe name words
-  const spokenWords = lower.split(/\s+/).filter(w => w.length > 2);
+  // Score every recipe by similarity to spoken words
+  const scored = recipes.map(r => {
+    const recipeLower  = r.name.toLowerCase();
+    const recipeWords  = recipeLower.split(/\s+/).map(w => w.replace(/[^a-z0-9]/g,'')).filter(w => w.length > 1 && !stopWords.has(w));
+    let score = 0;
 
-  const matched = recipes.filter(r => {
-    const recipeLower = r.name.toLowerCase();
-    // Exact name match
-    if (lower.includes(recipeLower)) return true;
+    // Exact full name match — highest score
+    if (lower.includes(recipeLower)) score += 100;
+
+    // Each recipe word that appears in spoken text
+    recipeWords.forEach(rw => {
+      if (spokenWords.includes(rw)) score += 20;
+      else if (spokenWords.some(sw => sw.includes(rw) || rw.includes(sw))) score += 10;
+    });
+
     // Tag match
-    if ((r.tags || []).some(tag => lower.includes(tag.toLowerCase()))) return true;
-    // Fuzzy: majority of recipe name words found in spoken text
-    const nameWords = recipeLower.split(/\s+/).filter(w => w.length > 2);
-    if (nameWords.length === 0) return false;
-    const hits = nameWords.filter(w => spokenWords.some(sw => sw.includes(w) || w.includes(sw)));
-    return hits.length >= Math.ceil(nameWords.length * 0.6);
-  });
+    (r.tags||[]).forEach(tag => {
+      if (lower.includes(tag.toLowerCase())) score += 15;
+    });
 
-  const forMatch = text.match(/for\s+([A-Z][a-z]+)/);
+    // Ingredient word match
+    (r.ingredients||[]).forEach(ing => {
+      const ingWords = ing.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
+      ingWords.forEach(iw => {
+        if (spokenWords.some(sw => sw === iw || sw.includes(iw))) score += 5;
+      });
+    });
+
+    // Bonus: proportion of recipe words matched
+    if (recipeWords.length > 0) {
+      const matchedCount = recipeWords.filter(rw => spokenWords.some(sw => sw === rw || sw.includes(rw) || rw.includes(sw))).length;
+      score += Math.round((matchedCount / recipeWords.length) * 30);
+    }
+
+    return { recipe: r, score };
+  }).filter(s => s.score > 0).sort((a,b) => b.score - a.score);
+
+  console.log('Top scored recipes:', scored.slice(0,5).map(s => `${s.recipe.name} (${s.score})`));
+
+  // Take matches that are within 30 points of the top score (avoids grabbing unrelated low-score matches)
+  const topScore = scored[0]?.score || 0;
+  const matched  = scored.filter(s => s.score >= Math.max(topScore - 30, 15)).slice(0, 4).map(s => s.recipe);
+
+  const forMatch   = text.match(/(?:for|order for)\s+([A-Za-z]+)/i);
   const customerName = forMatch ? forMatch[1] : null;
 
   const items = matched.map(r => {
-    const item = { name: r.name };
-    if (r.category === 'shake') {
-      item.size = lower.includes('32') ? '32oz' : lower.includes('24') ? '24oz' : '16oz';
-    }
-    if (r.category === 'tea') {
-      item.level = lower.includes('loaded') ? 'Loaded' : lower.includes('lit') ? 'Lit' : 'Sparked';
-    }
+    const item = { name: r.name, id: r.id, category: r.category };
+    if (r.category === 'shake') item.size  = lower.includes('32') ? '32oz' : lower.includes('24') ? '24oz' : '16oz';
+    if (r.category === 'tea')   item.level = lower.includes('loaded') ? 'Loaded' : lower.includes('lit') ? 'Lit' : 'Sparked';
     return item;
   });
 
   document.getElementById('aiThinking').classList.remove('show');
-
-  if (!items.length) {
-    toast('No recipes matched — try saying the name more clearly', 'error');
-    return;
-  }
-  buildOrderFromParsed(customerName, items);
+  // Always open confirm modal — staff reviews before sending
+  openConfirmModal(customerName || 'Guest', items);
+  if (!items.length) toast('No recipes matched — add manually in the popup', 'error');
 }
 
 function buildOrderFromParsed(customerName, itemsRaw) {
@@ -920,7 +1091,13 @@ function pushOrder(customerName, items) {
     completedAt: null
   };
   db.ref('orders/active/' + order.id).set(order)
-    .then(() => toast(`Order #${num} → Kitchen Queue!`, 'success'))
+    .then(() => {
+      toast(`Order #${num} → Kitchen Queue!`, 'success');
+      trackOrderStats(customerName, items);
+      // Reset quick order items if on quick page
+      quickOrderItems = [];
+      renderQuickOrderItems();
+    })
     .catch(err => toast('DB error: ' + err.message, 'error'));
 }
 
@@ -938,34 +1115,9 @@ function selectOption(type, value, btn) {
   btn.classList.add('selected');
 }
 
-function onRecipeSelectChange() {
-  const id = document.getElementById('recipeSelect').value;
-  const r  = recipes.find(r => r.id === id);
-  const sizeSel  = document.getElementById('sizeSelector');
-  const levelSel = document.getElementById('levelSelector');
-  sizeSel.style.display  = 'none';
-  levelSel.style.display = 'none';
-  if (!r) return;
-  if (r.category === 'shake') sizeSel.style.display  = 'block';
-  if (r.category === 'tea')   levelSel.style.display = 'block';
-}
+// onRecipeSelectChange replaced by autocomplete
 
-function addManualRecipe() {
-  const sel = document.getElementById('recipeSelect');
-  const id  = sel.value;
-  if (!id) return;
-  const r = recipes.find(r => r.id === id);
-  if (!r || manualOrderItems.find(i => i.id === id)) { toast('Already in order', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
-  if (r.category === 'shake') item.size  = selectedSize;
-  if (r.category === 'tea')   item.level = selectedLevel;
-  manualOrderItems.push(item);
-  renderManualOrderItems();
-  // Reset selectors
-  document.getElementById('sizeSelector').style.display  = 'none';
-  document.getElementById('levelSelector').style.display = 'none';
-  sel.value = '';
-}
+// addManualRecipe defined in autocomplete section above
 function renderManualOrderItems() {
   document.getElementById('manualOrder').innerHTML = manualOrderItems.map(item => {
     const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
@@ -1334,6 +1486,37 @@ function renderDashboard() {
       <div class="completed-time">${new Date(o.completedAt).toLocaleDateString()} ${formatTime(o.completedAt)}</div>
     </div>
   `).join('');
+  renderCustomerList();
+}
+
+function renderCustomerList(filter) {
+  const el = document.getElementById('customerList');
+  if (!el) return;
+  const q = filter || document.getElementById('customerSearch')?.value.trim().toLowerCase() || '';
+  const list = customerDB
+    .filter(c => !q || c.name.toLowerCase().includes(q))
+    .sort((a,b) => (b.visitCount||1) - (a.visitCount||1));
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:30px 0"><div class="empty-icon">👥</div><div class="empty-title">No customers yet</div><div>They appear here as orders are placed</div></div>`;
+    return;
+  }
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">` +
+    list.map(c => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${c.name}</div>
+          <div style="font-size:12px;color:var(--text-dim);">First: ${new Date(c.firstVisit).toLocaleDateString()}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:var(--orange);">${c.visitCount||1}</div>
+          <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">visit${(c.visitCount||1)!==1?'s':''}</div>
+        </div>
+      </div>`
+    ).join('') + '</div>';
+}
+
+function filterCustomers() {
+  renderCustomerList();
 }
 
 function exportOrders() {
@@ -1585,6 +1768,327 @@ function saveEditedOrder() {
   db.ref('orders/active/' + editOrderId).update({ customerName: name, items: editItems })
     .then(() => { toast('Order updated!', 'success'); closeModal('editOrderModal'); })
     .catch(err => toast(err.message, 'error'));
+}
+
+// ──────────────────────────────────────────────
+// AUTOCOMPLETE — RECIPE SEARCH
+// ──────────────────────────────────────────────
+let acSelectedRecipe = {};   // keyed by inputId
+let acHighlightIdx   = {};
+
+function onRecipeSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
+  const q    = document.getElementById(inputId).value.trim().toLowerCase();
+  const list = document.getElementById(listId);
+  acHighlightIdx[listId] = -1;
+  document.getElementById(sizeSelectorId).style.display  = 'none';
+  document.getElementById(levelSelectorId).style.display = 'none';
+  acSelectedRecipe[inputId] = null;
+  renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId);
+}
+
+function openDropdown(inputId, listId, sizeSelectorId, levelSelectorId) {
+  const q = document.getElementById(inputId).value.trim().toLowerCase();
+  renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId);
+}
+
+function toggleDropdown(inputId, listId, sizeSelectorId, levelSelectorId) {
+  const list = document.getElementById(listId);
+  if (list.classList.contains('open')) {
+    list.classList.remove('open');
+  } else {
+    document.getElementById(inputId).focus();
+    const q = document.getElementById(inputId).value.trim().toLowerCase();
+    renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId);
+  }
+}
+
+function renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId) {
+  const list = document.getElementById(listId);
+  if (!recipes || !recipes.length) {
+    list.innerHTML = '<div class="ac-empty">Recipes loading...</div>';
+    list.classList.add('open');
+    return;
+  }
+
+  // Filter: if no query show all, otherwise filter by name/tags/ingredients
+  const filtered = q
+    ? recipes.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        (r.tags||[]).some(t => t.toLowerCase().includes(q)) ||
+        (r.ingredients||[]).some(i => i.toLowerCase().includes(q))
+      )
+    : [...recipes].sort((a,b) => a.name.localeCompare(b.name));
+
+  const count = filtered.length;
+  const header = q
+    ? `<div class="ac-search-header"><span>${count} match${count!==1?'es':''} for "${q}"</span><span style="cursor:pointer;color:var(--text-dim);" onmousedown="clearSearch('${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">✕ Clear</span></div>`
+    : `<div class="ac-search-header"><span>All Recipes (${count})</span><span style="font-size:10px;">Type to filter</span></div>`;
+
+  if (!filtered.length) {
+    list.innerHTML = header + '<div class="ac-empty">No recipes match that search</div>';
+    list.classList.add('open');
+    return;
+  }
+
+  list.innerHTML = header + filtered.map(r =>
+    `<div class="autocomplete-item"
+      data-id="${r.id}"
+      onmousedown="selectACRecipe('${r.id}','${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">
+      <span>${q ? highlightMatch(r.name, q) : r.name}</span>
+      <span class="ac-cat">${r.category}</span>
+    </div>`
+  ).join('');
+  list.classList.add('open');
+}
+
+function clearSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
+  document.getElementById(inputId).value = '';
+  acSelectedRecipe[inputId] = null;
+  document.getElementById(sizeSelectorId).style.display = 'none';
+  document.getElementById(levelSelectorId).style.display = 'none';
+  renderDropdown('', inputId, listId, sizeSelectorId, levelSelectorId);
+}
+
+function highlightMatch(name, q) {
+  const idx = name.toLowerCase().indexOf(q);
+  if (idx < 0) return name;
+  return name.slice(0,idx) + '<strong style="color:var(--orange);">' + name.slice(idx,idx+q.length) + '</strong>' + name.slice(idx+q.length);
+}
+
+function selectACRecipe(recipeId, inputId, listId, sizeSelectorId, levelSelectorId) {
+  const r = recipes.find(r => r.id === recipeId);
+  if (!r) return;
+  document.getElementById(inputId).value = r.name;
+  document.getElementById(listId).classList.remove('open');
+  acSelectedRecipe[inputId] = r;
+  document.getElementById(sizeSelectorId).style.display  = r.category === 'shake' ? 'block' : 'none';
+  document.getElementById(levelSelectorId).style.display = r.category === 'tea'   ? 'block' : 'none';
+  // Reset option buttons
+  if (r.category === 'shake') {
+    document.getElementById(sizeSelectorId).querySelectorAll('.option-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
+    selectedSize = '16oz';
+  }
+  if (r.category === 'tea') {
+    document.getElementById(levelSelectorId).querySelectorAll('.option-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
+    selectedLevel = 'Sparked';
+  }
+}
+
+function onACKeydown(event, listId) {
+  const items = document.querySelectorAll(`#${listId} .autocomplete-item`);
+  if (!items.length) return;
+  if (event.key === 'ArrowDown') {
+    acHighlightIdx[listId] = Math.min((acHighlightIdx[listId]||0)+1, items.length-1);
+  } else if (event.key === 'ArrowUp') {
+    acHighlightIdx[listId] = Math.max((acHighlightIdx[listId]||0)-1, 0);
+  } else if (event.key === 'Enter') {
+    const hi = acHighlightIdx[listId];
+    if (hi >= 0 && items[hi]) items[hi].dispatchEvent(new MouseEvent('mousedown'));
+    event.preventDefault();
+    return;
+  } else { return; }
+  items.forEach((el,i) => el.classList.toggle('highlighted', i === acHighlightIdx[listId]));
+  event.preventDefault();
+}
+
+function hideAC(listId) {
+  const el = document.getElementById(listId);
+  if (el) el.classList.remove('open');
+}
+function hideACDelayed(listId) {
+  setTimeout(() => hideAC(listId), 200);
+}
+
+// ──────────────────────────────────────────────
+// CUSTOMER DATABASE
+// ──────────────────────────────────────────────
+function saveCustomer(name) {
+  if (!name || name === 'Guest' || !db) return;
+  // Check if already exists (case-insensitive)
+  const exists = customerDB.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    // Update visit count
+    db.ref('customers/' + exists.id).update({
+      visitCount: (exists.visitCount || 1) + 1,
+      lastVisit: new Date().toISOString()
+    });
+  } else {
+    const id = 'cust-' + Date.now();
+    db.ref('customers/' + id).set({
+      id,
+      name,
+      visitCount: 1,
+      firstVisit: new Date().toISOString(),
+      lastVisit: new Date().toISOString()
+    });
+  }
+}
+
+function onNameInput(inputId, acId) {
+  const q  = document.getElementById(inputId).value.trim().toLowerCase();
+  const ac = document.getElementById(acId);
+  if (!q) { ac.classList.remove('open'); return; }
+  // Search Firebase customer DB first, fall back to localStorage names
+  const dbMatches = customerDB.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
+  if (!dbMatches.length) { ac.classList.remove('open'); return; }
+  ac.innerHTML = dbMatches.map(c =>
+    `<div class="name-ac-item" onmousedown="pickName('${c.name}','${inputId}','${acId}')">
+      <span>${c.name}</span>
+      <span style="font-size:11px;color:var(--text-dim);margin-left:8px;">${c.visitCount||1} visit${(c.visitCount||1)!==1?'s':''}</span>
+    </div>`
+  ).join('');
+  ac.classList.add('open');
+}
+
+function pickName(name, inputId, acId) {
+  document.getElementById(inputId).value = name;
+  document.getElementById(acId).classList.remove('open');
+}
+
+// ──────────────────────────────────────────────
+// MANUAL ADD — voice page (uses search input)
+// ──────────────────────────────────────────────
+function addManualRecipe() {
+  const r = acSelectedRecipe['recipeSearchInput'];
+  if (!r) { toast('Select a recipe from the search results', 'error'); return; }
+  if (manualOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
+  const item = { id: r.id, name: r.name, category: r.category };
+  if (r.category === 'shake') item.size  = selectedSize;
+  if (r.category === 'tea')   item.level = selectedLevel;
+  manualOrderItems.push(item);
+  renderManualOrderItems();
+  document.getElementById('recipeSearchInput').value = '';
+  document.getElementById('sizeSelector').style.display  = 'none';
+  document.getElementById('levelSelector').style.display = 'none';
+  acSelectedRecipe['recipeSearchInput'] = null;
+}
+
+// ──────────────────────────────────────────────
+// QUICK ORDER PAGE
+// ──────────────────────────────────────────────
+let quickOrderItems  = [];
+let quickSize        = '16oz';
+let quickLevel       = 'Sparked';
+let lastOrder        = JSON.parse(localStorage.getItem('blendLastOrder') || 'null');
+let orderFrequency   = JSON.parse(localStorage.getItem('blendOrderFrequency') || '{}');
+
+function selectQuickOption(type, value, btn) {
+  if (type === 'size')  quickSize  = value;
+  if (type === 'level') quickLevel = value;
+  btn.closest('.option-selector').querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function addQuickRecipe() {
+  const r = acSelectedRecipe['quickRecipeSearch'];
+  if (!r) { toast('Select a recipe from the search results', 'error'); return; }
+  if (quickOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
+  const item = { id: r.id, name: r.name, category: r.category };
+  if (r.category === 'shake') item.size  = quickSize;
+  if (r.category === 'tea')   item.level = quickLevel;
+  quickOrderItems.push(item);
+  renderQuickOrderItems();
+  document.getElementById('quickRecipeSearch').value = '';
+  document.getElementById('quickSizeSelector').style.display  = 'none';
+  document.getElementById('quickLevelSelector').style.display = 'none';
+  acSelectedRecipe['quickRecipeSearch'] = null;
+}
+
+function renderQuickOrderItems() {
+  document.getElementById('quickOrder').innerHTML = quickOrderItems.map((item, idx) => {
+    const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
+                   item.level ? `<span class="tag-level-${item.level.toLowerCase()}">${item.level}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;">
+      <span>${item.name}</span>${optTag}
+      <span onclick="removeQuickItem(${idx})" style="cursor:pointer;color:var(--text-dim);font-size:16px;margin-left:2px;">×</span>
+    </div>`;
+  }).join('');
+}
+
+function removeQuickItem(idx) {
+  quickOrderItems.splice(idx, 1);
+  renderQuickOrderItems();
+}
+
+function submitQuickOrder() {
+  if (!quickOrderItems.length) { toast('Add at least one recipe', 'error'); return; }
+  const name = document.getElementById('quickCustomerName').value.trim() || 'Guest';
+  openConfirmModal(name, [...quickOrderItems]);
+}
+
+function renderQuickPage() {
+  // Last order bar
+  const bar = document.getElementById('lastOrderBar');
+  if (lastOrder && lastOrder.items && lastOrder.items.length) {
+    bar.style.display = 'flex';
+    document.getElementById('lastOrderItems').textContent = lastOrder.items.map(i => i.name).join(', ');
+  } else {
+    bar.style.display = 'none';
+  }
+
+  // Frequent recipes
+  const freqEl = document.getElementById('frequentBtns');
+  const sorted = Object.entries(orderFrequency).sort((a,b) => b[1]-a[1]).slice(0,8);
+  if (sorted.length) {
+    freqEl.innerHTML = sorted.map(([id, count]) => {
+      const r = recipes.find(r => r.id === id);
+      if (!r) return '';
+      return `<button class="quick-btn ${r.category}-btn" onclick="quickTapRecipe('${r.id}')">${r.name} <span style="font-size:10px;opacity:0.5;">${count}</span></button>`;
+    }).join('');
+  } else {
+    freqEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);">Order history will populate these</div>';
+  }
+
+  // Recent (last 8 unique recipes ordered)
+  const recentEl = document.getElementById('recentBtns');
+  const recentRecipeIds = JSON.parse(localStorage.getItem('blendRecentRecipes') || '[]');
+  if (recentRecipeIds.length) {
+    recentEl.innerHTML = recentRecipeIds.slice(0,8).map(id => {
+      const r = recipes.find(r => r.id === id);
+      if (!r) return '';
+      return `<button class="quick-btn ${r.category}-btn" onclick="quickTapRecipe('${r.id}')">${r.name}</button>`;
+    }).join('');
+  } else {
+    recentEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);">No recent orders yet</div>';
+  }
+}
+
+function quickTapRecipe(recipeId) {
+  const r = recipes.find(r => r.id === recipeId);
+  if (!r) return;
+  if (quickOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
+  const item = { id: r.id, name: r.name, category: r.category };
+  if (r.category === 'shake') item.size  = '16oz';
+  if (r.category === 'tea')   item.level = 'Sparked';
+  quickOrderItems.push(item);
+  renderQuickOrderItems();
+  // Show size/level in confirm modal where they can adjust
+  toast(`${r.name} added — adjust size/level in confirm`, '');
+}
+
+function repeatLastOrder() {
+  if (!lastOrder) return;
+  openConfirmModal(lastOrder.customerName || 'Guest', lastOrder.items.map(i => ({...i})));
+}
+
+// Track order frequency and recents when order is pushed
+function trackOrderStats(customerName, items) {
+  // Save last order
+  lastOrder = { customerName, items };
+  localStorage.setItem('blendLastOrder', JSON.stringify(lastOrder));
+  // Save customer to Firebase DB
+  saveCustomer(customerName);
+  // Update frequency
+  items.forEach(item => {
+    orderFrequency[item.id] = (orderFrequency[item.id] || 0) + 1;
+  });
+  localStorage.setItem('blendOrderFrequency', JSON.stringify(orderFrequency));
+  // Update recent recipes list
+  let recentRecipes = JSON.parse(localStorage.getItem('blendRecentRecipes') || '[]');
+  items.forEach(item => {
+    recentRecipes = [item.id, ...recentRecipes.filter(id => id !== item.id)];
+  });
+  localStorage.setItem('blendRecentRecipes', JSON.stringify(recentRecipes.slice(0,20)));
 }
 
 if (apiKey && apiKey.startsWith('sk-ant-')) {
