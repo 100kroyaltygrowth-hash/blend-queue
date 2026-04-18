@@ -212,6 +212,25 @@
 
   .section-label { font-family:'Barlow Condensed',sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:12px; }
 
+  /* COLLAPSIBLE COMPLETED SECTION */
+  .completed-toggle {
+    width:100%; display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; cursor:pointer; transition:all 0.2s;
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px;
+    text-transform:uppercase; letter-spacing:1px; color:var(--cream-dim);
+  }
+  .completed-toggle:hover { border-color:var(--green); background:var(--surface2); }
+  .completed-toggle.open  { border-color:var(--green); border-bottom-left-radius:0; border-bottom-right-radius:0; }
+  .completed-toggle-icon  { font-size:11px; color:var(--green); transition:transform 0.25s; display:inline-block; }
+  .completed-drawer {
+    max-height:0; overflow:hidden;
+    transition:max-height 0.35s ease, padding 0.25s ease;
+    background:var(--surface2); border:1px solid var(--green);
+    border-top:none; border-radius:0 0 10px 10px;
+  }
+  .completed-drawer.open { max-height:800px; padding:12px; }
+
   /* RECIPE SEARCH + DROPDOWN */
   .recipe-search-wrap { position:relative; flex:1; min-width:220px; }
   .recipe-search-row { display:flex; gap:0; }
@@ -493,24 +512,30 @@
     <div class="section-title">Kitchen <span>Queue</span></div>
     <div style="display:flex;gap:8px;align-items:center;">
       <div class="fb-status"><div class="fb-dot pending" id="fbDot2"></div><span id="fbLabel2">—</span></div>
-      <button class="btn btn-ghost btn-sm" onclick="clearCompletedToday()">Clear Completed</button>
     </div>
   </div>
-  <div class="queue-page-layout">
-    <div>
-      <div class="section-label" style="color:var(--orange);">⏳ Active</div>
-      <div class="scroll-area">
-        <div class="queue-list" id="activeQueue">
-          <div class="empty-state"><div class="empty-icon">🥤</div><div class="empty-title">Queue is Empty</div><div>Orders appear here live</div></div>
-        </div>
+
+  <!-- ACTIVE QUEUE — full width, priority -->
+  <div class="queue-list" id="activeQueue">
+    <div class="empty-state"><div class="empty-icon">🥤</div><div class="empty-title">Queue is Empty</div><div>Orders appear here live</div></div>
+  </div>
+
+  <!-- COMPLETED — collapsible, minimized by default -->
+  <div id="completedSection" style="margin-top:20px;">
+    <button class="completed-toggle" id="completedToggleBtn" onclick="toggleCompleted()">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="completed-toggle-icon" id="completedToggleIcon">▶</span>
+        <span style="color:var(--green);">✅ Completed Today</span>
+        <span class="badge" id="completedBadge" style="background:var(--green);">0</span>
       </div>
-    </div>
-    <div>
-      <div class="section-label" style="color:var(--green);">✅ Completed Today</div>
-      <div class="scroll-area">
-        <div class="completed-list" id="completedQueue">
-          <div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">None Yet</div></div>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="completedToggleHint" style="font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;">Tap to expand</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();clearCompletedToday()" style="font-size:11px;padding:4px 10px;">Clear</button>
+      </div>
+    </button>
+    <div class="completed-drawer" id="completedDrawer">
+      <div class="completed-list" id="completedQueue">
+        <div class="empty-state" style="padding:30px 0;"><div class="empty-icon">✅</div><div class="empty-title">None Yet</div></div>
       </div>
     </div>
   </div>
@@ -972,10 +997,19 @@ Respond ONLY with valid JSON (no markdown):
     });
     const data = await res.json();
     let parsed = { customerName: null, items: [] };
-    try { parsed = JSON.parse(data.content[0].text.trim()); } catch {}
+    try {
+      const raw = data.content[0].text.trim();
+      // Strip any markdown fences Claude might add
+      const cleaned = raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
+      parsed = JSON.parse(cleaned);
+    } catch(e) {
+      console.warn('Claude JSON parse failed, falling back to keyword match', e);
+      document.getElementById('aiThinking').classList.remove('show');
+      parseWithKeywords(text);
+      return;
+    }
     document.getElementById('aiThinking').classList.remove('show');
     buildOrderFromParsed(parsed.customerName, parsed.items || []);
-    // items may be array of strings or array of objects — both handled in buildOrderFromParsed
   } catch(err) {
     document.getElementById('aiThinking').classList.remove('show');
     toast('Claude error — using keyword match', 'error');
@@ -986,7 +1020,8 @@ Respond ONLY with valid JSON (no markdown):
 function parseWithKeywords(text) {
   if (!recipes || recipes.length === 0) {
     document.getElementById('aiThinking').classList.remove('show');
-    toast('Recipes still loading — try again in a moment', 'error');
+    openConfirmModal('Guest', []);
+    toast('Recipes still loading — add manually in the popup', 'error');
     return;
   }
 
@@ -1083,24 +1118,58 @@ function parseWithKeywords(text) {
 }
 
 function buildOrderFromParsed(customerName, itemsRaw) {
-  if (!itemsRaw.length) { toast('No recipes matched. Try again or add manually.', 'error'); return; }
+  // Always open confirm modal — even if empty, staff can add manually
+  if (!itemsRaw || !itemsRaw.length) {
+    openConfirmModal(customerName || 'Guest', []);
+    toast('No items parsed — add manually in the popup', 'error');
+    document.getElementById('voicePreview').classList.remove('show');
+    return;
+  }
+
+  const stopWords = new Set(['a','an','the','and','with','for','oz','shake','tea','size']);
+
   const resolvedItems = itemsRaw.map(raw => {
-    const nameStr = typeof raw === 'string' ? raw : raw.name;
-    const r = recipes.find(r => r.name.toLowerCase() === nameStr.toLowerCase()) ||
-              recipes.find(r => r.name.toLowerCase().includes(nameStr.toLowerCase().slice(0, 5)));
+    const nameStr = typeof raw === 'string' ? raw : (raw.name || '');
+    if (!nameStr) return null;
+
+    // 1. Exact match first
+    let r = recipes.find(r => r.name.toLowerCase() === nameStr.toLowerCase());
+
+    // 2. Contains match
+    if (!r) r = recipes.find(r => r.name.toLowerCase().includes(nameStr.toLowerCase()));
+    if (!r) r = recipes.find(r => nameStr.toLowerCase().includes(r.name.toLowerCase()));
+
+    // 3. Fuzzy scored match — same engine as parseWithKeywords
+    if (!r) {
+      const nameWords = nameStr.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+      const scored = recipes.map(recipe => {
+        const rWords = recipe.name.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+        let score = 0;
+        nameWords.forEach(nw => {
+          if (rWords.includes(nw)) score += 20;
+          else if (rWords.some(rw => rw.includes(nw) || nw.includes(rw))) score += 10;
+        });
+        if (rWords.length > 0) score += Math.round((nameWords.filter(nw => rWords.some(rw => rw.includes(nw) || nw.includes(rw))).length / rWords.length) * 30);
+        return { recipe, score };
+      }).filter(s => s.score > 0).sort((a,b) => b.score - a.score);
+      if (scored.length) r = scored[0].recipe;
+    }
+
     if (!r) return null;
+
     const item = { id: r.id, name: r.name, category: r.category };
     if (typeof raw === 'object') {
       if (raw.size  && r.category === 'shake') item.size  = raw.size;
       if (raw.level && r.category === 'tea')   item.level = raw.level;
     }
-    // defaults
     if (r.category === 'shake' && !item.size)  item.size  = '16oz';
     if (r.category === 'tea'   && !item.level) item.level = 'Sparked';
     return item;
   }).filter(Boolean);
-  if (!resolvedItems.length) { toast('Could not match recipes. Add manually.', 'error'); return; }
+
+  // Always open confirm — staff reviews before kitchen
   openConfirmModal(customerName || 'Guest', resolvedItems);
+  if (!resolvedItems.length) toast('Could not match recipes — add manually in the popup', 'error');
   document.getElementById('voicePreview').classList.remove('show');
 }
 
@@ -1180,8 +1249,12 @@ function renderQueue() {
     new Date(o.completedAt).toDateString() === today
   ).sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt));
 
+  // Update completed badge
+  const completedBadge = document.getElementById('completedBadge');
+  if (completedBadge) completedBadge.textContent = completedToday.length;
+
   if (!active.length) {
-    activeEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🥤</div><div class="empty-title">Queue is Empty</div><div>Orders appear here instantly</div></div>`;
+    activeEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🥤</div><div class="empty-title">Queue is Empty</div><div>Orders appear here live</div></div>`;
   } else {
     activeEl.innerHTML = active.map(order => `
       <div class="queue-card" id="card-${order.id}">
@@ -1223,6 +1296,18 @@ function renderQueue() {
 
 function togglePanel(orderId) {
   document.getElementById('panel-' + orderId)?.classList.toggle('open');
+}
+
+function toggleCompleted() {
+  const drawer = document.getElementById('completedDrawer');
+  const btn    = document.getElementById('completedToggleBtn');
+  const icon   = document.getElementById('completedToggleIcon');
+  const hint   = document.getElementById('completedToggleHint');
+  const isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+  hint.textContent = isOpen ? 'Tap to expand' : 'Tap to collapse';
 }
 
 function completeOrder(orderId, cb) {
