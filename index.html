@@ -990,65 +990,94 @@ function parseWithKeywords(text) {
     return;
   }
 
-  const lower = text.toLowerCase();
-  const stopWords = new Set(['a','an','the','and','with','for','me','my','please','can','i','want','get','have','one','two','three','make','order','need','id','like','ill','could']);
-  const spokenWords = lower.split(/\s+/).map(w => w.replace(/[^a-z0-9]/g,'')).filter(w => w.length > 1 && !stopWords.has(w));
+  // ── Normalize spoken text ──
+  let normalized = text.toLowerCase()
+    .replace(/\btwenty[- ]?four\b/g, '24')
+    .replace(/\bthirty[- ]?two\b/g, '32')
+    .replace(/\bsixteen\b/g, '16')
+    .replace(/\bounce[s]?\b/g, 'oz')
+    .replace(/\bounce\b/g, 'oz')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 
-  // Score every recipe by similarity to spoken words
+  console.log('Normalized:', normalized);
+
+  // ── Extract customer name ──
+  // Handles: "for Mary", "for Mary Perryman", "for Mary Anne Smith"
+  let customerName = null;
+  const forMatch = normalized.match(/\bfor\s+([a-z]+(?:\s+[a-z]+){0,2})\s*$/i)
+                || normalized.match(/\bfor\s+([a-z]+(?:\s+[a-z]+){0,2})\b/i);
+  if (forMatch) {
+    customerName = forMatch[1].replace(/\b\w/g, l => l.toUpperCase());
+    // Remove the "for Name" part from text so it doesn't interfere with recipe matching
+    normalized = normalized.replace(forMatch[0], ' ').trim();
+  }
+
+  // ── Extract size ──
+  let detectedSize = '16oz';
+  if (normalized.includes('32') || normalized.includes('thirty two')) detectedSize = '32oz';
+  else if (normalized.includes('24') || normalized.includes('twenty four')) detectedSize = '24oz';
+
+  // ── Extract tea level ──
+  let detectedLevel = 'Sparked';
+  if (normalized.includes('loaded')) detectedLevel = 'Loaded';
+  else if (normalized.includes('lit')) detectedLevel = 'Lit';
+
+  // ── Score every recipe ──
+  const stopWords = new Set(['a','an','the','and','with','for','me','my','please','can','i','want','get','have','one','two','three','make','order','need','id','like','ill','could','oz','ounce','ounces','size','large','small','medium']);
+  const spokenWords = normalized.split(/\s+/).filter(w => w.length > 1 && !stopWords.has(w));
+
+  console.log('Spoken words:', spokenWords);
+
   const scored = recipes.map(r => {
-    const recipeLower  = r.name.toLowerCase();
-    const recipeWords  = recipeLower.split(/\s+/).map(w => w.replace(/[^a-z0-9]/g,'')).filter(w => w.length > 1 && !stopWords.has(w));
+    const rLower     = r.name.toLowerCase().replace(/[^a-z0-9\s]/g,' ');
+    const rWords     = rLower.split(/\s+/).filter(w => w.length > 1 && !stopWords.has(w));
     let score = 0;
 
-    // Exact full name match — highest score
-    if (lower.includes(recipeLower)) score += 100;
+    // Exact full recipe name in normalized text
+    if (normalized.includes(rLower)) score += 100;
 
-    // Each recipe word that appears in spoken text
-    recipeWords.forEach(rw => {
-      if (spokenWords.includes(rw)) score += 20;
-      else if (spokenWords.some(sw => sw.includes(rw) || rw.includes(sw))) score += 10;
+    // Word-level matching — each recipe word scored against spoken words
+    let wordHits = 0;
+    rWords.forEach(rw => {
+      if (spokenWords.includes(rw)) { score += 20; wordHits++; }
+      else if (spokenWords.some(sw => sw.includes(rw) && rw.length > 3)) { score += 10; wordHits++; }
+      else if (spokenWords.some(sw => rw.includes(sw) && sw.length > 3)) { score += 8; wordHits++; }
     });
+
+    // Proportion of recipe words matched
+    if (rWords.length > 0) {
+      score += Math.round((wordHits / rWords.length) * 40);
+    }
 
     // Tag match
     (r.tags||[]).forEach(tag => {
-      if (lower.includes(tag.toLowerCase())) score += 15;
+      if (normalized.includes(tag.toLowerCase())) score += 15;
     });
-
-    // Ingredient word match
-    (r.ingredients||[]).forEach(ing => {
-      const ingWords = ing.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
-      ingWords.forEach(iw => {
-        if (spokenWords.some(sw => sw === iw || sw.includes(iw))) score += 5;
-      });
-    });
-
-    // Bonus: proportion of recipe words matched
-    if (recipeWords.length > 0) {
-      const matchedCount = recipeWords.filter(rw => spokenWords.some(sw => sw === rw || sw.includes(rw) || rw.includes(sw))).length;
-      score += Math.round((matchedCount / recipeWords.length) * 30);
-    }
 
     return { recipe: r, score };
-  }).filter(s => s.score > 0).sort((a,b) => b.score - a.score);
+  })
+  .filter(s => s.score >= 10)   // low floor — let confirm modal catch mistakes
+  .sort((a,b) => b.score - a.score);
 
-  console.log('Top scored recipes:', scored.slice(0,5).map(s => `${s.recipe.name} (${s.score})`));
+  console.log('Top matches:', scored.slice(0,5).map(s => `${s.recipe.name} (${s.score})`));
 
-  // Take matches that are within 30 points of the top score (avoids grabbing unrelated low-score matches)
+  // ── Select matches ──
+  // Take top match + any others within 40 points of it
   const topScore = scored[0]?.score || 0;
-  const matched  = scored.filter(s => s.score >= Math.max(topScore - 30, 15)).slice(0, 4).map(s => s.recipe);
+  const matched  = scored.filter(s => s.score >= topScore - 40).slice(0, 5).map(s => s.recipe);
 
-  const forMatch   = text.match(/(?:for|order for)\s+([A-Za-z]+)/i);
-  const customerName = forMatch ? forMatch[1] : null;
-
+  // ── Build items with size/level ──
   const items = matched.map(r => {
     const item = { name: r.name, id: r.id, category: r.category };
-    if (r.category === 'shake') item.size  = lower.includes('32') ? '32oz' : lower.includes('24') ? '24oz' : '16oz';
-    if (r.category === 'tea')   item.level = lower.includes('loaded') ? 'Loaded' : lower.includes('lit') ? 'Lit' : 'Sparked';
+    if (r.category === 'shake') item.size  = detectedSize;
+    if (r.category === 'tea')   item.level = detectedLevel;
     return item;
   });
 
   document.getElementById('aiThinking').classList.remove('show');
-  // Always open confirm modal — staff reviews before sending
+
+  // Always open confirm so staff can review
   openConfirmModal(customerName || 'Guest', items);
   if (!items.length) toast('No recipes matched — add manually in the popup', 'error');
 }
