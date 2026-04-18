@@ -991,7 +991,13 @@ Teas come in levels: Sparked, Lit, Loaded (default Sparked if not mentioned).
 Spoken order: "${text}"
 
 Respond ONLY with valid JSON (no markdown):
-{"customerName": "Name or null", "items": [{"name": "Exact Recipe Name", "size": "16oz or null", "level": "Sparked or null"}]}`
+{"customerName": "Mary Perryman", "items": [{"name": "Exact Recipe Name", "size": "24oz", "level": "Loaded"}]}
+
+Rules:
+- customerName: the person's name if mentioned after "for", otherwise use null (not the string "null")
+- size: only for shakes — "16oz", "24oz", or "32oz". null for teas.
+- level: only for teas — "Sparked", "Lit", or "Loaded". null for shakes.
+- Match recipe names as closely as possible to the available list.`
         }]
       })
     });
@@ -1009,7 +1015,9 @@ Respond ONLY with valid JSON (no markdown):
       return;
     }
     document.getElementById('aiThinking').classList.remove('show');
-    buildOrderFromParsed(parsed.customerName, parsed.items || []);
+    // Clean up customerName — Claude sometimes returns the string "null"
+    const cName = parsed.customerName && parsed.customerName !== 'null' ? parsed.customerName : null;
+    buildOrderFromParsed(cName, parsed.items || []);
   } catch(err) {
     document.getElementById('aiThinking').classList.remove('show');
     toast('Claude error — using keyword match', 'error');
@@ -1040,10 +1048,12 @@ function parseWithKeywords(text) {
   // ── Extract customer name ──
   // Handles: "for Mary", "for Mary Perryman", "for Mary Anne Smith"
   let customerName = null;
-  const forMatch = normalized.match(/\bfor\s+([a-z]+(?:\s+[a-z]+){0,2})\s*$/i)
-                || normalized.match(/\bfor\s+([a-z]+(?:\s+[a-z]+){0,2})\b/i);
+  // Try to extract name — works on normalized (lowercase) text, then title-cases the result
+  // Patterns: "for Mary", "for Mary Perryman", "for Mary Anne Smith"
+  const forMatch = normalized.match(/\bfor\s+([a-z][a-z]+(?:\s+[a-z][a-z]+){0,2})\s*$/)
+                || normalized.match(/\bfor\s+([a-z][a-z]+(?:\s+[a-z][a-z]+){0,2})(?=\s|$)/);
   if (forMatch) {
-    customerName = forMatch[1].replace(/\b\w/g, l => l.toUpperCase());
+    customerName = forMatch[1].trim().replace(/\b\w/g, l => l.toUpperCase());
     // Remove the "for Name" part from text so it doesn't interfere with recipe matching
     normalized = normalized.replace(forMatch[0], ' ').trim();
   }
@@ -1113,14 +1123,14 @@ function parseWithKeywords(text) {
   document.getElementById('aiThinking').classList.remove('show');
 
   // Always open confirm so staff can review
-  openConfirmModal(customerName || 'Guest', items);
+  openConfirmModal(customerName || '', items);
   if (!items.length) toast('No recipes matched — add manually in the popup', 'error');
 }
 
 function buildOrderFromParsed(customerName, itemsRaw) {
   // Always open confirm modal — even if empty, staff can add manually
   if (!itemsRaw || !itemsRaw.length) {
-    openConfirmModal(customerName || 'Guest', []);
+    openConfirmModal(customerName || '', []);
     toast('No items parsed — add manually in the popup', 'error');
     document.getElementById('voicePreview').classList.remove('show');
     return;
@@ -1168,7 +1178,7 @@ function buildOrderFromParsed(customerName, itemsRaw) {
   }).filter(Boolean);
 
   // Always open confirm — staff reviews before kitchen
-  openConfirmModal(customerName || 'Guest', resolvedItems);
+  openConfirmModal(customerName || '', resolvedItems);
   if (!resolvedItems.length) toast('Could not match recipes — add manually in the popup', 'error');
   document.getElementById('voicePreview').classList.remove('show');
 }
@@ -1696,7 +1706,7 @@ function renderOptionTag(item) {
 
 function openConfirmModal(customerName, items) {
   confirmItems = items.map(i => ({...i}));
-  document.getElementById('confirmCustomerName').value = customerName;
+  document.getElementById('confirmCustomerName').value = (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '';
   document.getElementById('confirmAddRecipe').value = '';
   document.getElementById('confirmSizeSelector').style.display = 'none';
   document.getElementById('confirmLevelSelector').style.display = 'none';
@@ -1785,7 +1795,7 @@ function confirmAddItem() {
 
 function confirmAndSendOrder() {
   if (!confirmItems.length) { toast('Add at least one item', 'error'); return; }
-  const name = document.getElementById('confirmCustomerName').value.trim() || 'Guest';
+  const name = document.getElementById('confirmCustomerName').value.trim() || 'Guest';  // Guest only if truly blank at send time
   pushOrder(name, confirmItems);
   closeModal('confirmOrderModal');
   // Clear manual order builder
