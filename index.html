@@ -107,8 +107,10 @@
   @keyframes spin { to{transform:rotate(360deg)} }
 
   /* QUEUE CARDS */
-  .queue-list { display:flex; flex-direction:column; gap:12px; }
-  .queue-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; display:flex; align-items:flex-start; gap:16px; transition:all 0.3s; animation:slideIn 0.3s ease; position:relative; overflow:hidden; }
+  .queue-list { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media(min-width:700px) { .queue-list { grid-template-columns:1fr 1fr; } }
+  @media(min-width:1100px) { .queue-list { grid-template-columns:1fr 1fr 1fr; } }
+  .queue-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; display:flex; align-items:flex-start; gap:16px; transition:all 0.3s; animation:slideIn 0.3s ease; position:relative; overflow:hidden; height:100%; box-sizing:border-box; }
   .queue-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--orange); }
   .queue-card.completing { opacity:0.4; transform:translateX(30px); }
   @keyframes slideIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
@@ -211,6 +213,24 @@
   .scroll-area::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
   .section-label { font-family:'Barlow Condensed',sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:12px; }
+
+  /* DUPLICATE REVIEW */
+  .dup-card { background:var(--surface2); border:1px solid var(--yellow); border-radius:10px; padding:14px 16px; }
+  .dup-card.action-skip    { border-color:var(--border); opacity:0.5; }
+  .dup-card.action-add     { border-color:var(--green); }
+  .dup-card.action-replace { border-color:var(--orange); }
+  .dup-name { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:17px; color:var(--cream); margin-bottom:8px; }
+  .dup-compare { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .dup-side { background:var(--surface3); border-radius:6px; padding:8px 10px; font-size:11px; }
+  .dup-side-label { font-family:'Barlow Condensed',sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; font-weight:700; }
+  .dup-ing { color:var(--cream-dim); line-height:1.6; }
+  .dup-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .dup-action-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:5px 12px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.15s; }
+  .dup-action-btn.active-skip    { background:var(--surface3); border-color:var(--text-dim); color:var(--cream-dim); }
+  .dup-action-btn.active-add     { background:rgba(76,175,110,0.2); border-color:var(--green); color:var(--green); }
+  .dup-action-btn.active-replace { background:var(--orange-glow); border-color:var(--orange); color:var(--orange); }
+  .dup-tag-input { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:4px 10px; color:var(--text); font-size:12px; outline:none; width:140px; transition:border-color 0.2s; }
+  .dup-tag-input:focus { border-color:var(--orange); }
 
   /* COLLAPSIBLE COMPLETED SECTION */
   .completed-toggle {
@@ -387,18 +407,20 @@
       <input type="text" class="search-input" id="manualCustomerName" placeholder="Customer name" autocomplete="off" oninput="onNameInput('manualCustomerName','nameAC1')" onblur="hideAC('nameAC1')">
       <div class="name-autocomplete" id="nameAC1"></div>
     </div>
-    <div class="recipe-search-wrap">
-      <div class="recipe-search-row">
-        <input type="text" class="recipe-search-input" id="recipeSearchInput" placeholder="Search or browse recipes..." autocomplete="off"
-          oninput="onRecipeSearch('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
-          onkeydown="onACKeydown(event,'recipeAC1')"
-          onfocus="openDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
-          onblur="hideACDelayed('recipeAC1')">
-        <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')">▾</button>
+    <div style="display:flex;gap:0;flex:1;min-width:220px;align-items:flex-start;">
+      <div class="recipe-search-wrap" style="flex:1;min-width:0;">
+        <div class="recipe-search-row">
+          <input type="text" class="recipe-search-input" id="recipeSearchInput" placeholder="Search or browse recipes..." autocomplete="off"
+            oninput="onRecipeSearch('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
+            onkeydown="onACKeydown(event,'recipeAC1')"
+            onfocus="openDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')"
+            onblur="hideACDelayed('recipeAC1')">
+          <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('recipeSearchInput','recipeAC1','sizeSelector','levelSelector')">▾</button>
+        </div>
+        <div class="autocomplete-list" id="recipeAC1"></div>
       </div>
-      <div class="autocomplete-list" id="recipeAC1"></div>
+      <button class="btn btn-primary btn-sm" onclick="addManualRecipe()" style="white-space:nowrap;border-radius:0 var(--radius) var(--radius) 0;height:42px;margin-left:-1px;">+ Add</button>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="addManualRecipe()" style="white-space:nowrap;">+ Add</button>
   </div>
 
   <!-- SIZE selector (shakes) -->
@@ -466,18 +488,20 @@
       <input type="text" class="search-input" id="quickCustomerName" placeholder="Customer name" autocomplete="off" oninput="onNameInput('quickCustomerName','nameAC2')" onblur="hideAC('nameAC2')">
       <div class="name-autocomplete" id="nameAC2"></div>
     </div>
-    <div class="recipe-search-wrap">
-      <div class="recipe-search-row">
-        <input type="text" class="recipe-search-input" id="quickRecipeSearch" placeholder="Search or browse recipes..." autocomplete="off"
-          oninput="onRecipeSearch('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
-          onkeydown="onACKeydown(event,'recipeAC2')"
-          onfocus="openDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
-          onblur="hideACDelayed('recipeAC2')">
-        <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')">▾</button>
+    <div style="display:flex;gap:0;flex:1;min-width:220px;align-items:flex-start;">
+      <div class="recipe-search-wrap" style="flex:1;min-width:0;">
+        <div class="recipe-search-row">
+          <input type="text" class="recipe-search-input" id="quickRecipeSearch" placeholder="Search or browse recipes..." autocomplete="off"
+            oninput="onRecipeSearch('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
+            onkeydown="onACKeydown(event,'recipeAC2')"
+            onfocus="openDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')"
+            onblur="hideACDelayed('recipeAC2')">
+          <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('quickRecipeSearch','recipeAC2','quickSizeSelector','quickLevelSelector')">▾</button>
+        </div>
+        <div class="autocomplete-list" id="recipeAC2"></div>
       </div>
-      <div class="autocomplete-list" id="recipeAC2"></div>
+      <button class="btn btn-primary btn-sm" onclick="addQuickRecipe()" style="white-space:nowrap;border-radius:0 var(--radius) var(--radius) 0;height:42px;margin-left:-1px;">+ Add</button>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="addQuickRecipe()" style="white-space:nowrap;">+ Add</button>
   </div>
 
   <!-- SIZE selector -->
@@ -645,10 +669,19 @@
     <div id="confirmItemsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
 
     <!-- Add more items -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-      <select class="form-input" id="confirmAddRecipe" onchange="onConfirmRecipeChange()" style="flex:1;min-width:160px;">
-        <option value="">+ Add another recipe</option>
-      </select>
+    <div style="display:flex;gap:0;margin-bottom:6px;">
+      <div class="recipe-search-wrap" style="flex:1;min-width:0;">
+        <div class="recipe-search-row">
+          <input type="text" class="recipe-search-input" id="confirmRecipeSearch" placeholder="Search or browse recipes..." autocomplete="off"
+            oninput="onRecipeSearch('confirmRecipeSearch','confirmRecipeAC','confirmSizeSelector','confirmLevelSelector')"
+            onkeydown="onACKeydown(event,'confirmRecipeAC')"
+            onfocus="openDropdown('confirmRecipeSearch','confirmRecipeAC','confirmSizeSelector','confirmLevelSelector')"
+            onblur="hideACDelayed('confirmRecipeAC')">
+          <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('confirmRecipeSearch','confirmRecipeAC','confirmSizeSelector','confirmLevelSelector')">▾</button>
+        </div>
+        <div class="autocomplete-list" id="confirmRecipeAC"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="confirmAddBtn" onclick="confirmAddItem()" style="white-space:nowrap;border-radius:0 var(--radius) var(--radius) 0;height:42px;margin-left:-1px;">+ Add</button>
     </div>
     <!-- Size selector for confirm modal -->
     <div id="confirmSizeSelector" style="display:none;margin-bottom:10px;">
@@ -687,10 +720,19 @@
     </div>
     <div class="form-label" style="margin-bottom:8px;">Items</div>
     <div id="editItemsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-      <select class="form-input" id="editAddRecipe" onchange="onEditRecipeChange()" style="flex:1;min-width:160px;">
-        <option value="">+ Add another recipe</option>
-      </select>
+    <div style="display:flex;gap:0;margin-bottom:6px;">
+      <div class="recipe-search-wrap" style="flex:1;min-width:0;">
+        <div class="recipe-search-row">
+          <input type="text" class="recipe-search-input" id="editRecipeSearch" placeholder="Search or browse recipes..." autocomplete="off"
+            oninput="onRecipeSearch('editRecipeSearch','editRecipeAC','editSizeSelector','editLevelSelector')"
+            onkeydown="onACKeydown(event,'editRecipeAC')"
+            onfocus="openDropdown('editRecipeSearch','editRecipeAC','editSizeSelector','editLevelSelector')"
+            onblur="hideACDelayed('editRecipeAC')">
+          <button class="recipe-dropdown-btn" onmousedown="toggleDropdown('editRecipeSearch','editRecipeAC','editSizeSelector','editLevelSelector')">▾</button>
+        </div>
+        <div class="autocomplete-list" id="editRecipeAC"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="editAddBtn" onclick="editAddItem()" style="white-space:nowrap;border-radius:0 var(--radius) var(--radius) 0;height:42px;margin-left:-1px;">+ Add</button>
     </div>
     <div id="editSizeSelector" style="display:none;margin-bottom:10px;">
       <div class="form-label">Size</div>
@@ -712,6 +754,70 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('editOrderModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditedOrder()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE TAG MODAL -->
+<div class="modal-overlay" id="sourceTagModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title">Name This <span style="color:var(--orange);">Recipe Source</span></div>
+    <p style="font-size:13px;color:var(--cream-dim);margin-bottom:16px;line-height:1.6;">
+      Give this upload a source tag so recipes stay organized and duplicates can coexist.<br>
+      Example: <strong style="color:var(--orange);">Kym</strong>, <strong style="color:var(--orange);">Jake</strong>, <strong style="color:var(--orange);">HQ Menu</strong>
+    </p>
+    <div class="form-group">
+      <label class="form-label">Source / Location Tag (optional)</label>
+      <input type="text" class="form-input" id="sourceTagInput" placeholder="e.g. Kym, Jake, Main Menu..." maxlength="30">
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">
+      Preview: <span id="sourceTagPreview" style="color:var(--orange);">Recipe Name</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cancelSourceTag()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSourceTag()">Next → Review Duplicates</button>
+    </div>
+  </div>
+</div>
+
+<!-- DUPLICATE REVIEW MODAL -->
+<div class="modal-overlay" id="dupReviewModal">
+  <div class="modal" style="max-width:720px;max-height:90vh;">
+    <div class="modal-title">Review <span style="color:var(--orange);">Import</span></div>
+
+    <!-- Summary bar -->
+    <div id="dupSummaryBar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;"></span>
+        <span id="dupCountNew" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--green);">0</span>
+        <span style="font-size:12px;color:var(--text-dim);">New</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--yellow);display:inline-block;"></span>
+        <span id="dupCountDup" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--yellow);">0</span>
+        <span style="font-size:12px;color:var(--text-dim);">Duplicates</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--text-dim);display:inline-block;"></span>
+        <span id="dupCountSkip" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text-dim);">0</span>
+        <span style="font-size:12px;color:var(--text-dim);">Skipped</span>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="dupSelectAll('skip')">Skip All Dups</button>
+        <button class="btn btn-ghost btn-sm" onclick="dupSelectAll('add')">Add All Dups</button>
+        <button class="btn btn-ghost btn-sm" onclick="dupSelectAll('replace')">Replace All</button>
+      </div>
+    </div>
+
+    <!-- Duplicate list -->
+    <div id="dupList" style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+
+    <!-- New recipes notice -->
+    <div id="dupNewNotice" style="font-size:13px;color:var(--text-dim);padding:8px 12px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--green);margin-bottom:4px;"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('dupReviewModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="executeImport()">✅ Confirm Import</button>
     </div>
   </div>
 </div>
@@ -1461,8 +1567,14 @@ function dragLeave()  { document.getElementById('fileDropZone').classList.remove
 function dropFile(e)  { e.preventDefault(); dragLeave(); const f = e.dataTransfer.files[0]; if(f) processFile(f); }
 function handleFileUpload(e) { const f = e.target.files[0]; if(f) processFile(f); }
 
+// Pending import state
+let pendingImportFile = null;
+let pendingImportRecipes = null;
+
 function processFile(file) {
   if (!db) { toast('Connect Firebase first', 'error'); return; }
+  pendingImportFile = file;
+  pendingImportRecipes = null;
 
   // Recipe Keeper ZIP export
   if (file.name.endsWith('.zip')) {
@@ -1502,7 +1614,8 @@ function processFile(file) {
       }));
     }
     if (!imported.length) { toast('Could not parse file', 'error'); return; }
-    pushRecipesToFirebase(imported);
+    pendingImportRecipes = imported;
+    showSourceTagModal(file.name);
   };
   reader.readAsText(file);
 }
@@ -1533,7 +1646,8 @@ async function processRecipeKeeperZip(file) {
     const html = await htmlFile.async('string');
     const imported = parseRecipeKeeperHTML(html);
     if (!imported.length) { toast('No recipes found in ZIP', 'error'); return; }
-    pushRecipesToFirebase(imported);
+    pendingImportRecipes = imported;
+    showSourceTagModal(file.name);
   } catch(err) {
     toast('ZIP parse error: ' + err.message, 'error');
     console.error(err);
@@ -1580,6 +1694,167 @@ function pushRecipesToFirebase(imported) {
   db.ref('recipes').update(batch)
     .then(() => toast(`${imported.length} recipes imported!`, 'success'))
     .catch(err => toast(err.message, 'error'));
+}
+
+// ──────────────────────────────────────────────
+// DUPLICATE DETECTION + REVIEW
+// ──────────────────────────────────────────────
+let dupReviewData = []; // {incoming, existing|null, action, extraTag}
+
+function nameSimilarity(a, b) {
+  // Strip source tags for comparison: "Lavender Dragon - Kym" → "Lavender Dragon"
+  const clean = s => s.replace(/\s*-\s*[^-]+$/, '').toLowerCase().trim();
+  const ca = clean(a), cb = clean(b);
+  if (ca === cb) return 1.0;
+  // Jaccard similarity on word sets
+  const wa = new Set(ca.split(/\s+/));
+  const wb = new Set(cb.split(/\s+/));
+  const inter = [...wa].filter(w => wb.has(w)).length;
+  const union = new Set([...wa, ...wb]).size;
+  return union === 0 ? 0 : inter / union;
+}
+
+function ingredientsSimilarity(a, b) {
+  const ia = (a.ingredients||[]).map(x=>x.toLowerCase()).sort().join('|');
+  const ib = (b.ingredients||[]).map(x=>x.toLowerCase()).sort().join('|');
+  return ia === ib ? 1.0 : 0;
+}
+
+function runDuplicateCheck(incoming) {
+  dupReviewData = incoming.map(r => {
+    // Find best match in existing recipes
+    let bestMatch = null, bestScore = 0;
+    recipes.forEach(existing => {
+      const ns = nameSimilarity(r.name, existing.name);
+      const is = ingredientsSimilarity(r, existing);
+      const score = ns * 0.7 + is * 0.3;
+      if (score > bestScore) { bestScore = score; bestMatch = existing; }
+    });
+
+    const isDuplicate = bestScore >= 0.75;
+    const isIdentical = bestScore >= 0.95 && ingredientsSimilarity(r, bestMatch||{}) === 1.0;
+
+    return {
+      incoming: r,
+      existing: isDuplicate ? bestMatch : null,
+      score: bestScore,
+      isDuplicate,
+      isIdentical,
+      // Default action: skip if identical, review if similar, add if new
+      action: isIdentical ? 'skip' : isDuplicate ? 'skip' : 'add',
+      extraTag: ''
+    };
+  });
+
+  renderDupReview();
+  openModal('dupReviewModal');
+}
+
+function renderDupReview() {
+  const dups    = dupReviewData.filter(d => d.isDuplicate);
+  const newOnes = dupReviewData.filter(d => !d.isDuplicate);
+  const skipped = dupReviewData.filter(d => d.action === 'skip').length;
+
+  document.getElementById('dupCountNew').textContent  = newOnes.length;
+  document.getElementById('dupCountDup').textContent  = dups.length;
+  document.getElementById('dupCountSkip').textContent = skipped;
+
+  const newNotice = document.getElementById('dupNewNotice');
+  newNotice.textContent = newOnes.length
+    ? `${newOnes.length} new recipe${newOnes.length!==1?'s':''} will be added automatically.`
+    : 'No new recipes in this import.';
+
+  const list = document.getElementById('dupList');
+  if (!dups.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;text-transform:uppercase;">No Duplicates Found!</div>';
+    return;
+  }
+
+  list.innerHTML = dups.map((d, idx) => {
+    const globalIdx = dupReviewData.indexOf(d);
+    const existIng  = (d.existing?.ingredients||[]).slice(0,5).join(', ') || 'No ingredients';
+    const incomIng  = (d.incoming?.ingredients||[]).slice(0,5).join(', ') || 'No ingredients';
+    const matchPct  = Math.round(d.score * 100);
+
+    return `<div class="dup-card action-${d.action}" id="dup-card-${globalIdx}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="dup-name">${d.incoming.name}</div>
+        <span style="font-size:11px;background:${d.isIdentical?'rgba(76,175,110,0.15)':'rgba(240,180,41,0.15)'};
+          border:1px solid ${d.isIdentical?'var(--green)':'var(--yellow)'};
+          color:${d.isIdentical?'var(--green)':'var(--yellow)'};
+          padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700;">
+          ${d.isIdentical ? 'Identical' : matchPct+'% match'}
+        </span>
+      </div>
+      <div class="dup-compare">
+        <div class="dup-side">
+          <div class="dup-side-label">📁 In Database (${d.existing?.name||''})</div>
+          <div class="dup-ing">${existIng}${(d.existing?.ingredients||[]).length>5?'...':''}</div>
+        </div>
+        <div class="dup-side">
+          <div class="dup-side-label">📥 Incoming</div>
+          <div class="dup-ing">${incomIng}${(d.incoming?.ingredients||[]).length>5?'...':''}</div>
+        </div>
+      </div>
+      <div class="dup-actions">
+        <button class="dup-action-btn ${d.action==='skip'?'active-skip':''}" onclick="setDupAction(${globalIdx},'skip',this)">⊘ Skip</button>
+        <button class="dup-action-btn ${d.action==='add'?'active-add':''}" onclick="setDupAction(${globalIdx},'add',this)">+ Add Anyway</button>
+        <button class="dup-action-btn ${d.action==='replace'?'active-replace':''}" onclick="setDupAction(${globalIdx},'replace',this)">↺ Replace</button>
+        ${d.action==='add' ? `<input class="dup-tag-input" placeholder="Extra tag (optional)" value="${d.extraTag}"
+          oninput="setDupTag(${globalIdx}, this.value)" onblur="setDupTag(${globalIdx}, this.value)">` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setDupAction(idx, action, btn) {
+  dupReviewData[idx].action = action;
+  renderDupReview();
+}
+
+function setDupTag(idx, val) {
+  dupReviewData[idx].extraTag = val.trim();
+}
+
+function dupSelectAll(action) {
+  dupReviewData.forEach(d => { if (d.isDuplicate) d.action = action; });
+  renderDupReview();
+}
+
+function executeImport() {
+  const toImport = [];
+
+  dupReviewData.forEach(d => {
+    if (!d.isDuplicate) {
+      // New recipe — always add
+      toImport.push(d.incoming);
+    } else if (d.action === 'skip') {
+      // Do nothing
+    } else if (d.action === 'add') {
+      // Add with optional extra tag to differentiate
+      const r = { ...d.incoming };
+      if (d.extraTag) {
+        r.name = r.name + ' - ' + d.extraTag;
+        r.id   = r.id + '_' + d.extraTag.toLowerCase().replace(/\s+/g,'_');
+      }
+      toImport.push(r);
+    } else if (d.action === 'replace') {
+      // Overwrite existing with incoming, keep existing ID
+      const r = { ...d.incoming, id: d.existing.id };
+      toImport.push(r);
+    }
+  });
+
+  closeModal('dupReviewModal');
+  pendingImportRecipes = null;
+  pendingImportFile    = null;
+
+  if (!toImport.length) {
+    toast('Nothing imported — all duplicates were skipped', '');
+    return;
+  }
+
+  pushRecipesToFirebase(toImport);
 }
 
 // ──────────────────────────────────────────────
@@ -1688,6 +1963,60 @@ function toast(msg, type='') {
 // INIT
 // ──────────────────────────────────────────────
 // ──────────────────────────────────────────────
+// SOURCE TAG MODAL
+// ──────────────────────────────────────────────
+function showSourceTagModal(filename) {
+  // Pre-fill input with filename (strip extension) as a starting suggestion
+  const suggested = filename.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ').trim();
+  const input = document.getElementById('sourceTagInput');
+  input.value = '';
+  input.placeholder = `e.g. Kym, Jake, ${suggested}`;
+  updateSourceTagPreview();
+  openModal('sourceTagModal');
+  setTimeout(() => input.focus(), 100);
+}
+
+function updateSourceTagPreview() {
+  const tag = document.getElementById('sourceTagInput').value.trim();
+  document.getElementById('sourceTagPreview').textContent = tag
+    ? `Recipe Name - ${tag}`
+    : 'Recipe Name (no tag)';
+}
+
+// Wire preview update on input
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('sourceTagInput');
+  if (inp) inp.addEventListener('input', updateSourceTagPreview);
+});
+
+function cancelSourceTag() {
+  pendingImportRecipes = null;
+  pendingImportFile = null;
+  closeModal('sourceTagModal');
+  toast('Import cancelled');
+}
+
+function confirmSourceTag() {
+  if (!pendingImportRecipes) { closeModal('sourceTagModal'); return; }
+  const tag = document.getElementById('sourceTagInput').value.trim();
+
+  // Apply tag to names
+  let tagged = pendingImportRecipes.map(r => {
+    const updated = { ...r };
+    if (tag) {
+      updated.name   = r.name + ' - ' + tag;
+      updated.source = tag;
+      updated.id     = r.id + '_' + tag.toLowerCase().replace(/\s+/g, '_');
+    }
+    return updated;
+  });
+
+  closeModal('sourceTagModal');
+  // Run duplicate detection then show review modal
+  runDuplicateCheck(tagged);
+}
+
+// ──────────────────────────────────────────────
 // CONFIRM ORDER MODAL
 // ──────────────────────────────────────────────
 let confirmItems = [];
@@ -1760,16 +2089,7 @@ function removeConfirmItem(idx) {
   renderConfirmItems();
 }
 
-function onConfirmRecipeChange() {
-  const id = document.getElementById('confirmAddRecipe').value;
-  const r  = recipes.find(r => r.id === id);
-  document.getElementById('confirmSizeSelector').style.display  = 'none';
-  document.getElementById('confirmLevelSelector').style.display = 'none';
-  document.getElementById('confirmAddBtn').style.display = id ? 'inline-flex' : 'none';
-  if (!r) return;
-  if (r.category === 'shake') document.getElementById('confirmSizeSelector').style.display  = 'block';
-  if (r.category === 'tea')   document.getElementById('confirmLevelSelector').style.display = 'block';
-}
+function onConfirmRecipeChange() { /* replaced by autocomplete */ }
 
 function selectConfirmOption(type, value, btn) {
   if (type === 'size')  confirmSize  = value;
@@ -1779,17 +2099,16 @@ function selectConfirmOption(type, value, btn) {
 }
 
 function confirmAddItem() {
-  const id = document.getElementById('confirmAddRecipe').value;
-  const r  = recipes.find(r => r.id === id);
-  if (!r) return;
+  const r = acSelectedRecipe['confirmRecipeSearch'];
+  if (!r) { toast('Select a recipe from the search list', 'error'); return; }
   const item = { id: r.id, name: r.name, category: r.category };
   if (r.category === 'shake') item.size  = confirmSize;
   if (r.category === 'tea')   item.level = confirmLevel;
   confirmItems.push(item);
-  document.getElementById('confirmAddRecipe').value = '';
+  document.getElementById('confirmRecipeSearch').value = '';
   document.getElementById('confirmSizeSelector').style.display  = 'none';
   document.getElementById('confirmLevelSelector').style.display = 'none';
-  document.getElementById('confirmAddBtn').style.display = 'none';
+  acSelectedRecipe['confirmRecipeSearch'] = null;
   renderConfirmItems();
 }
 
@@ -1852,16 +2171,7 @@ function updateEditItemSize(idx, val)  { editItems[idx].size  = val; renderEditI
 function updateEditItemLevel(idx, val) { editItems[idx].level = val; renderEditItems(); }
 function removeEditItem(idx) { editItems.splice(idx, 1); renderEditItems(); }
 
-function onEditRecipeChange() {
-  const id = document.getElementById('editAddRecipe').value;
-  const r  = recipes.find(r => r.id === id);
-  document.getElementById('editSizeSelector').style.display  = 'none';
-  document.getElementById('editLevelSelector').style.display = 'none';
-  document.getElementById('editAddBtn').style.display = id ? 'inline-flex' : 'none';
-  if (!r) return;
-  if (r.category === 'shake') document.getElementById('editSizeSelector').style.display  = 'block';
-  if (r.category === 'tea')   document.getElementById('editLevelSelector').style.display = 'block';
-}
+function onEditRecipeChange() { /* replaced by autocomplete */ }
 
 function selectEditOption(type, value, btn) {
   if (type === 'size')  editSize  = value;
@@ -1871,17 +2181,16 @@ function selectEditOption(type, value, btn) {
 }
 
 function editAddItem() {
-  const id = document.getElementById('editAddRecipe').value;
-  const r  = recipes.find(r => r.id === id);
-  if (!r) return;
+  const r = acSelectedRecipe['editRecipeSearch'];
+  if (!r) { toast('Select a recipe from the search list', 'error'); return; }
   const item = { id: r.id, name: r.name, category: r.category };
   if (r.category === 'shake') item.size  = editSize;
   if (r.category === 'tea')   item.level = editLevel;
   editItems.push(item);
-  document.getElementById('editAddRecipe').value = '';
+  document.getElementById('editRecipeSearch').value = '';
   document.getElementById('editSizeSelector').style.display  = 'none';
   document.getElementById('editLevelSelector').style.display = 'none';
-  document.getElementById('editAddBtn').style.display = 'none';
+  acSelectedRecipe['editRecipeSearch'] = null;
   renderEditItems();
 }
 
