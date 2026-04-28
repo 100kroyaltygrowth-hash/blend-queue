@@ -5,10 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blend Queue — Recipe Order System</title>
 
-<!-- Firebase SDK v9 compat (CDN) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
 
@@ -825,6 +821,51 @@
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!-- SCRIPT                                                        -->
 <!-- ══════════════════════════════════════════════════════════════ -->
+<!-- Firebase SDK — primary: gstatic, fallback: jsdelivr -->
+<script>
+(function() {
+  var loaded = 0;
+  var scripts = [
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js'
+  ];
+  var fallbacks = [
+    'https://cdn.jsdelivr.net/npm/firebase@10.12.2/compat/app/dist/index.js',
+    'https://cdn.jsdelivr.net/npm/firebase@10.12.2/compat/database/dist/index.js'
+  ];
+
+  function onAllLoaded() {
+    window._firebaseSDKReady = true;
+    if (window._firebaseSDKReadyCb) window._firebaseSDKReadyCb();
+  }
+
+  function loadScript(src, fallback, cb) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function() {
+      console.warn('Primary CDN failed, trying fallback:', fallback);
+      var s2 = document.createElement('script');
+      s2.src = fallback;
+      s2.onload = cb;
+      s2.onerror = function() {
+        console.error('Both CDNs failed for Firebase SDK');
+        cb(); // continue anyway so app can show error
+      };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  }
+
+  // Load sequentially — database depends on app
+  loadScript(scripts[0], fallbacks[0], function() {
+    loadScript(scripts[1], fallbacks[1], function() {
+      onAllLoaded();
+    });
+  });
+})();
+</script>
+
 <script>
 // ──────────────────────────────────────────────
 // STATE
@@ -866,37 +907,59 @@ function loadFirebaseConfig() {
 
 function saveFirebaseConfig() {
   const cfg = {
-    apiKey:      document.getElementById('fbApiKey').value.trim(),
-    authDomain:  document.getElementById('fbAuthDomain').value.trim(),
-    databaseURL: document.getElementById('fbDatabaseURL').value.trim(),
-    projectId:   document.getElementById('fbProjectId').value.trim(),
+    apiKey:        document.getElementById('fbApiKey').value.trim(),
+    authDomain:    document.getElementById('fbAuthDomain').value.trim(),
+    databaseURL:   document.getElementById('fbDatabaseURL').value.trim(),
+    projectId:     document.getElementById('fbProjectId').value.trim(),
     storageBucket: document.getElementById('fbProjectId').value.trim() + '.appspot.com',
     messagingSenderId: '',
     appId: ''
   };
   if (!cfg.apiKey || !cfg.databaseURL) { toast('API Key and Database URL are required', 'error'); return; }
   localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
-  // Delete any existing app before re-connecting
-  const existing = firebase.apps;
-  Promise.all(existing.map(a => a.delete())).then(() => {
-    initFirebase(cfg);
-    document.getElementById('firebaseSetup').style.display = 'none';
-    toast('Firebase connected!', 'success');
-  }).catch(() => {
-    initFirebase(cfg);
-    document.getElementById('firebaseSetup').style.display = 'none';
-    toast('Firebase connected!', 'success');
-  });
+
+  // Guard: make sure Firebase SDK is loaded
+  if (typeof firebase === 'undefined') {
+    toast('Firebase SDK still loading — try again in a moment', 'error');
+    setFbStatus('error', 'SDK not loaded');
+    return;
+  }
+
+  // Delete existing app instance then re-init
+  const doInit = () => {
+    try {
+      if (firebase.apps && firebase.apps.length) {
+        Promise.all(firebase.apps.map(a => a.delete()))
+          .catch(() => {})
+          .finally(() => {
+            initFirebase(cfg);
+          });
+      } else {
+        initFirebase(cfg);
+      }
+      document.getElementById('firebaseSetup').style.display = 'none';
+      toast('Firebase connected!', 'success');
+    } catch(e) {
+      toast('Firebase init error: ' + e.message, 'error');
+      console.error(e);
+    }
+  };
+  doInit();
 }
 
 function initFirebase(cfg) {
   try {
-    // Re-init safe: reuse existing app if already initialized
+    if (typeof firebase === 'undefined') {
+      setFbStatus('error', 'SDK missing');
+      toast('Firebase SDK not loaded — check your internet connection', 'error');
+      return;
+    }
+    // Re-init safe: reuse existing app if config matches, otherwise create new
     let app;
-    if (firebase.apps.length) {
-      app = firebase.apps[0];
-    } else {
-      app = firebase.initializeApp(cfg);
+    try {
+      app = firebase.app(); // get default app if exists
+    } catch(e) {
+      app = firebase.initializeApp(cfg); // create if none exists
     }
     db = firebase.database(app);
 
@@ -998,27 +1061,34 @@ function showPage(name, btn) {
 // CLAUDE API KEY
 // ──────────────────────────────────────────────
 function saveApiKey() {
-  apiKey = document.getElementById('apiKeyInput').value.trim();
+  const input = document.getElementById('apiKeyInput');
+  if (!input) return;
+  apiKey = input.value.trim();
   localStorage.setItem('blendApiKey', apiKey);
   const s = document.getElementById('apiStatus');
-  if (apiKey.startsWith('sk-ant-')) {
-    localStorage.setItem('blendApiKey', apiKey);
+  // Accept any sk-ant- key regardless of what follows
+  if (apiKey && apiKey.includes('sk-ant-')) {
     showApiConnected();
     toast('Claude AI connected', 'success');
+  } else if (!apiKey) {
+    if (s) { s.textContent = 'No key entered'; s.className = 'api-status'; }
   } else {
-    s.textContent = 'Key format issue — check your key';
-    s.className = 'api-status';
+    if (s) { s.textContent = 'Key format issue — should contain sk-ant-'; s.className = 'api-status'; }
   }
 }
 
 function showApiConnected() {
-  document.getElementById('apiConnectedBar').style.display = 'flex';
-  document.getElementById('apiInputBar').style.display = 'none';
+  const bar = document.getElementById('apiConnectedBar');
+  const inp = document.getElementById('apiInputBar');
+  if (bar) bar.style.display = 'flex';
+  if (inp) inp.style.display = 'none';
 }
 
 function showApiInput() {
-  document.getElementById('apiConnectedBar').style.display = 'none';
-  document.getElementById('apiInputBar').style.display = 'block';
+  const bar = document.getElementById('apiConnectedBar');
+  const inp = document.getElementById('apiInputBar');
+  if (bar) bar.style.display = 'none';
+  if (inp) inp.style.display = 'block';
 }
 
 // ──────────────────────────────────────────────
@@ -1064,7 +1134,7 @@ function stopListening() {
 
 async function parseVoiceOrder(text) {
   document.getElementById('aiThinking').classList.add('show');
-  if (apiKey && apiKey.startsWith('sk-ant-')) {
+  if (apiKey && apiKey.includes('sk-ant-')) {
     await parseWithClaude(text);
   } else {
     parseWithKeywords(text);
@@ -1766,7 +1836,7 @@ function renderDupReview() {
 
   const list = document.getElementById('dupList');
   if (!dups.length) {
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;text-transform:uppercase;">No Duplicates Found!</div>';
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--green);font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:18px;text-transform:uppercase;">No Duplicates Found!</div>';
     return;
   }
 
@@ -1903,11 +1973,11 @@ function renderCustomerList(filter) {
     list.map(c => `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${c.name}</div>
+          <div style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${c.name}</div>
           <div style="font-size:12px;color:var(--text-dim);">First: ${new Date(c.firstVisit).toLocaleDateString()}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:24px;color:var(--orange);">${c.visitCount||1}</div>
+          <div style="font-family:Barlow Condensed,sans-serif;font-weight:900;font-size:24px;color:var(--orange);">${c.visitCount||1}</div>
           <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">visit${(c.visitCount||1)!==1?'s':''}</div>
         </div>
       </div>`
@@ -2060,7 +2130,7 @@ function renderConfirmItems() {
   document.getElementById('confirmItemsList').innerHTML = confirmItems.map((item, idx) => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
       <div style="display:flex;align-items:center;gap:8px;flex:1;">
-        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
+        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
         ${renderOptionTag(item)}
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -2145,7 +2215,7 @@ function renderEditItems() {
   document.getElementById('editItemsList').innerHTML = editItems.map((item, idx) => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
       <div style="display:flex;align-items:center;gap:8px;flex:1;">
-        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
+        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
         ${renderOptionTag(item)}
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -2524,11 +2594,41 @@ function trackOrderStats(customerName, items) {
   localStorage.setItem('blendRecentRecipes', JSON.stringify(recentRecipes.slice(0,20)));
 }
 
-if (apiKey && apiKey.startsWith('sk-ant-')) {
-  document.getElementById('apiKeyInput').value = apiKey;
-  showApiConnected();
+// Wait for DOM + Firebase SDK to be fully ready
+function appInit() {
+  if (apiKey && apiKey.includes('sk-ant-')) {
+    const inp = document.getElementById('apiKeyInput');
+    if (inp) inp.value = apiKey;
+    showApiConnected();
+  }
+  // Load Firebase config if SDK is ready, otherwise wait for it
+  if (typeof firebase !== 'undefined') {
+    loadFirebaseConfig();
+  } else {
+    // SDK still loading — register callback
+    window._firebaseSDKReadyCb = loadFirebaseConfig;
+    setFbStatus('pending', 'Loading SDK...');
+    // Final fallback: poll every 200ms up to 5 seconds
+    let attempts = 0;
+    const poll = setInterval(() => {
+      attempts++;
+      if (typeof firebase !== 'undefined') {
+        clearInterval(poll);
+        loadFirebaseConfig();
+      } else if (attempts > 25) {
+        clearInterval(poll);
+        setFbStatus('error', 'SDK failed');
+        toast('Firebase SDK failed to load — check network or ad blocker', 'error');
+      }
+    }, 200);
+  }
 }
-loadFirebaseConfig();
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', appInit);
+} else {
+  appInit();
+}
 </script>
 </body>
 </html>
