@@ -313,10 +313,13 @@
     <button class="nav-tab" onclick="showPage('dashboard', this)">📊 Dashboard</button>
   </div>
   <div class="nav-right">
-    <div class="fb-status">
+    <button class="fb-status" id="fbStatusBtn" onclick="reopenFirebaseSetup()" type="button"
+      style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;"
+      title="Click to edit Firebase config">
       <div class="fb-dot pending" id="fbDot"></div>
       <span id="fbLabel">No DB</span>
-    </div>
+      <span style="font-size:10px;color:var(--text-dim);">⚙️</span>
+    </button>
   </div>
 </nav>
 
@@ -507,7 +510,13 @@
   <div class="section-header">
     <div class="section-title">Kitchen <span>Queue</span></div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <div class="fb-status"><div class="fb-dot pending" id="fbDot2"></div><span id="fbLabel2">—</span></div>
+      <button class="fb-status" onclick="reopenFirebaseSetup()" type="button"
+        style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;"
+        title="Click to edit Firebase config">
+        <div class="fb-dot pending" id="fbDot2"></div>
+        <span id="fbLabel2">—</span>
+        <span style="font-size:10px;color:var(--text-dim);">⚙️</span>
+      </button>
     </div>
   </div>
 
@@ -895,6 +904,33 @@ function saveFirebaseConfig() {
     }
   };
   doInit();
+}
+
+// Re-open the Firebase setup card from the status dot.
+// Pre-fills the inputs with whatever's currently saved so the user
+// can edit one field instead of re-typing the whole config.
+function reopenFirebaseSetup() {
+  const saved = localStorage.getItem(FB_CONFIG_KEY);
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      set('fbApiKey',      cfg.apiKey);
+      set('fbAuthDomain',  cfg.authDomain);
+      set('fbDatabaseURL', cfg.databaseURL);
+      set('fbProjectId',   cfg.projectId);
+    } catch {}
+  }
+  const card = document.getElementById('firebaseSetup');
+  if (card) {
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  // Make sure the Voice page is visible (the card lives there)
+  const voiceTab = document.querySelector('.nav-tab');
+  if (voiceTab && !document.getElementById('page-order').classList.contains('active')) {
+    showPage('order', voiceTab);
+  }
 }
 
 function initFirebase(cfg) {
