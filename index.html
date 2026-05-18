@@ -359,39 +359,15 @@
     <span style="font-size:12px;color:var(--text-dim);margin-left:12px;">Saved to your browser — enter once per device</span>
   </div>
 
-  <!-- CLAUDE API KEY -->
-  <div class="api-config" id="apiConfig">
-    <div id="apiConnectedBar" style="display:none;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:18px;">🤖</span>
-        <div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--green);">✅ Claude AI Connected</div>
-          <div style="font-size:12px;color:var(--text-dim);">Voice parsing enabled</div>
-        </div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="showApiInput()">Edit Key</button>
-    </div>
-    <div id="apiInputBar">
-      <div class="api-config-title">🤖 Claude AI — Voice Parsing</div>
-      <div class="api-row">
-        <input type="password" class="form-input" id="apiKeyInput" placeholder="sk-ant-...">
-        <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Save</button>
-      </div>
-      <div class="api-status" id="apiStatus">No key — voice will use keyword matching</div>
-    </div>
-  </div>
-
   <!-- MIC -->
   <div class="mic-section">
-    <div class="mic-label">🎙️ Hold to Speak Order</div>
-    <button class="mic-btn" id="micBtn"
-      onmousedown="startListening()" onmouseup="stopListening()"
-      ontouchstart="startListening(event)" ontouchend="stopListening()">🎙️</button>
-    <div class="mic-status" id="micStatus">Hold button to record</div>
+    <div class="mic-label">🎙️ Tap to Speak Order</div>
+    <button class="mic-btn" id="micBtn" type="button" onclick="toggleRecording()">🎙️</button>
+    <div class="mic-status" id="micStatus">Tap to start recording</div>
     <div class="voice-preview" id="voicePreview"></div>
     <div class="ai-thinking" id="aiThinking">
       <div class="spinner"></div>
-      <span>Claude is parsing your order...</span>
+      <span id="aiThinkingLabel">Transcribing & parsing your order…</span>
     </div>
   </div>
 
@@ -852,10 +828,8 @@ let completedOrders = {};   // Firebase snapshot
 let customerDB      = [];   // Firebase customer records
 let manualOrderItems = [];
 let currentViewRecipeId = null;
-let apiKey        = localStorage.getItem('blendApiKey') || '';
 let orderCounter  = parseInt(localStorage.getItem('blendOrderCounter') || '1');
-let recognition   = null;
-let isListening   = false;
+let recognition   = null;  // Used by Web Speech fallback only
 let db            = null;  // Firebase db reference
 
 // ──────────────────────────────────────────────
@@ -1034,150 +1008,237 @@ function showPage(name, btn) {
 }
 
 // ──────────────────────────────────────────────
-// CLAUDE API KEY
+// VOICE — tap-to-toggle recording → Netlify function (Whisper + Claude)
+// Falls back to Web Speech API if MediaRecorder or the function isn't
+// available (e.g. local file:// preview without netlify dev).
 // ──────────────────────────────────────────────
-function saveApiKey() {
-  const input = document.getElementById('apiKeyInput');
-  if (!input) return;
-  apiKey = input.value.trim();
-  localStorage.setItem('blendApiKey', apiKey);
-  const s = document.getElementById('apiStatus');
-  // Accept any sk-ant- key regardless of what follows
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    showApiConnected();
-    toast('Claude AI connected', 'success');
-  } else if (!apiKey) {
-    if (s) { s.textContent = 'No key entered'; s.className = 'api-status'; }
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let mediaStream = null;
+
+async function toggleRecording() {
+  if (isRecording) {
+    // If the Web Speech fallback is running, stop it instead of MediaRecorder
+    if (recognition && (!mediaRecorder || mediaRecorder.state === 'inactive')) {
+      try { recognition.stop(); } catch {}
+      return;
+    }
+    stopRecording();
   } else {
-    if (s) { s.textContent = 'Key format issue — should contain sk-ant-'; s.className = 'api-status'; }
+    await startRecording();
   }
 }
 
-function showApiConnected() {
-  const bar = document.getElementById('apiConnectedBar');
-  const inp = document.getElementById('apiInputBar');
-  if (bar) bar.style.display = 'flex';
-  if (inp) inp.style.display = 'none';
+async function startRecording() {
+  // Need MediaRecorder + getUserMedia for the high-quality path
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    toast('MediaRecorder unsupported — using browser speech recognition', '');
+    fallbackWebSpeechStart();
+    return;
+  }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    toast('Mic permission denied: ' + err.message, 'error');
+    return;
+  }
+
+  // Pick the first MIME type the browser supports
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+  let mimeType = '';
+  for (const m of candidates) {
+    if (window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
+      mimeType = m; break;
+    }
+  }
+
+  try {
+    mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+  } catch (err) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    toast('Recorder failed to start: ' + err.message, 'error');
+    return;
+  }
+
+  audioChunks = [];
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    const blobType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+    const blob = new Blob(audioChunks, { type: blobType });
+    audioChunks = [];
+    if (!blob.size) {
+      setMicIdle();
+      toast('No audio captured', 'error');
+      return;
+    }
+    await sendAudioToBackend(blob);
+  };
+
+  mediaRecorder.start();
+  isRecording = true;
+  const btn = document.getElementById('micBtn');
+  btn.classList.add('listening');
+  btn.textContent = '⏹';
+  const status = document.getElementById('micStatus');
+  status.textContent = '🔴 Recording… tap to stop';
+  status.className = 'mic-status active';
+  document.getElementById('voicePreview').classList.remove('show');
 }
 
-function showApiInput() {
-  const bar = document.getElementById('apiConnectedBar');
-  const inp = document.getElementById('apiInputBar');
-  if (bar) bar.style.display = 'none';
-  if (inp) inp.style.display = 'block';
+function stopRecording() {
+  if (!mediaRecorder) { setMicIdle(); return; }
+  if (mediaRecorder.state !== 'inactive') {
+    try { mediaRecorder.stop(); } catch (e) { /* ignore */ }
+  }
+  isRecording = false;
+  const btn = document.getElementById('micBtn');
+  btn.classList.remove('listening');
+  btn.textContent = '🎙️';
+  const status = document.getElementById('micStatus');
+  status.textContent = 'Processing audio…';
+  status.className = 'mic-status active';
 }
 
-// ──────────────────────────────────────────────
-// VOICE
-// ──────────────────────────────────────────────
-function startListening(e) {
-  if (e) e.preventDefault();
+function setMicIdle() {
+  isRecording = false;
+  const btn = document.getElementById('micBtn');
+  if (btn) { btn.classList.remove('listening'); btn.textContent = '🎙️'; }
+  const status = document.getElementById('micStatus');
+  if (status) { status.textContent = 'Tap to start recording'; status.className = 'mic-status'; }
+  const ai = document.getElementById('aiThinking');
+  if (ai) ai.classList.remove('show');
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const r = reader.result || '';
+      const comma = r.indexOf(',');
+      resolve(comma >= 0 ? r.slice(comma + 1) : r);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function sendAudioToBackend(blob) {
+  const ai = document.getElementById('aiThinking');
+  const aiLabel = document.getElementById('aiThinkingLabel');
+  if (aiLabel) aiLabel.textContent = 'Uploading audio…';
+  if (ai) ai.classList.add('show');
+
+  let base64;
+  try {
+    base64 = await blobToBase64(blob);
+  } catch (err) {
+    setMicIdle();
+    toast('Could not read audio: ' + err.message, 'error');
+    return;
+  }
+
+  if (aiLabel) aiLabel.textContent = 'Transcribing & parsing…';
+
+  try {
+    const res = await fetch('/.netlify/functions/voice-parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioBase64: base64,
+        mimeType: blob.type || 'audio/webm',
+        recipeNames: recipes.map(r => r.name).join(', ')
+      })
+    });
+
+    if (!res.ok) {
+      let errBody = '';
+      try { errBody = await res.text(); } catch {}
+      console.warn('voice-parse error', res.status, errBody);
+      setMicIdle();
+      if (res.status === 404) {
+        toast('Voice server not deployed — falling back to browser speech', 'error');
+        fallbackWebSpeechFromBlob(blob);
+        return;
+      }
+      toast('Voice server error (' + res.status + ') — try again', 'error');
+      return;
+    }
+
+    const data = await res.json();
+    setMicIdle();
+
+    if (data.transcript) {
+      const preview = document.getElementById('voicePreview');
+      preview.textContent = '"' + data.transcript + '"';
+      preview.classList.add('show');
+    }
+
+    if (!data.transcript && !(data.items || []).length) {
+      toast('No speech detected', 'error');
+      openConfirmModal('', []);
+      return;
+    }
+
+    buildOrderFromParsed(data.customerName, data.items || []);
+  } catch (err) {
+    setMicIdle();
+    toast('Network error: ' + err.message, 'error');
+  }
+}
+
+// ── Fallback: Web Speech API (used only if MediaRecorder is missing
+//    or the Netlify function is unavailable). Same tap-to-toggle UX.
+function fallbackWebSpeechStart() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('Speech recognition requires Chrome', 'error'); return; }
+  if (!SR) { toast('Speech recognition unavailable in this browser', 'error'); return; }
   recognition = new SR();
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = 'en-US';
+  let finalText = '';
   recognition.onstart = () => {
-    isListening = true;
+    isRecording = true;
     document.getElementById('micBtn').classList.add('listening');
-    document.getElementById('micStatus').textContent = '🔴 Listening...';
+    document.getElementById('micBtn').textContent = '⏹';
+    document.getElementById('micStatus').textContent = '🔴 Recording (browser)… tap to stop';
     document.getElementById('micStatus').className = 'mic-status active';
     document.getElementById('voicePreview').classList.remove('show');
   };
   recognition.onresult = e => {
-    const t = Array.from(e.results).map(r => r[0].transcript).join('');
-    window._lastVoiceTranscript = t;
-    document.getElementById('voicePreview').textContent = '"' + t + '"';
-    document.getElementById('voicePreview').classList.add('show');
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t + ' ';
+      else interim += t;
+    }
+    const preview = document.getElementById('voicePreview');
+    preview.textContent = '"' + (finalText + interim).trim() + '"';
+    preview.classList.add('show');
   };
+  recognition.onerror = e => { toast('Mic error: ' + e.error, 'error'); setMicIdle(); };
   recognition.onend = () => {
-    isListening = false;
-    document.getElementById('micBtn').classList.remove('listening');
-    document.getElementById('micStatus').textContent = 'Hold button to record';
-    document.getElementById('micStatus').className = 'mic-status';
-    // Use raw stored transcript to avoid quote-stripping bugs
-    const text = (window._lastVoiceTranscript || '').trim();
-    if (text) parseVoiceOrder(text);
-  };
-  recognition.onerror = e => {
-    toast('Mic error: ' + e.error, 'error');
-    document.getElementById('micBtn').classList.remove('listening');
+    isRecording = false;
+    setMicIdle();
+    const text = finalText.trim();
+    if (text) {
+      document.getElementById('aiThinking').classList.add('show');
+      const lbl = document.getElementById('aiThinkingLabel');
+      if (lbl) lbl.textContent = 'Matching recipes…';
+      parseWithKeywords(text);
+    }
   };
   recognition.start();
 }
-function stopListening() {
-  if (recognition && isListening) recognition.stop();
+
+// Used if MediaRecorder captured fine but the netlify function 404s.
+// We can't re-feed the blob to Web Speech (different APIs), so just
+// nudge the user to talk again via the browser fallback.
+function fallbackWebSpeechFromBlob(_blob) {
+  toast('Tap mic again to use browser speech recognition', '');
 }
 
-async function parseVoiceOrder(text) {
-  document.getElementById('aiThinking').classList.add('show');
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    await parseWithClaude(text);
-  } else {
-    parseWithKeywords(text);
-  }
-}
-
-async function parseWithClaude(text) {
-  const recipeNames = recipes.map(r => r.name).join(', ');
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:500,
-        messages:[{
-          role:'user',
-          content:`You are an order parser for Blend nutrition cafe. Parse the spoken order and match items to the recipe list.
-
-Available recipes: ${recipeNames}
-
-Shakes come in sizes: 16oz, 24oz, 32oz (default 16oz if not mentioned).
-Teas come in levels: Sparked, Lit, Loaded (default Sparked if not mentioned).
-
-Spoken order: "${text}"
-
-Respond ONLY with valid JSON (no markdown):
-{"customerName": "Mary Perryman", "items": [{"name": "Exact Recipe Name", "size": "24oz", "level": "Loaded"}]}
-
-Rules:
-- customerName: the person's name if mentioned after "for", otherwise use null (not the string "null")
-- size: only for shakes — "16oz", "24oz", or "32oz". null for teas.
-- level: only for teas — "Sparked", "Lit", or "Loaded". null for shakes.
-- Match recipe names as closely as possible to the available list.`
-        }]
-      })
-    });
-    const data = await res.json();
-    let parsed = { customerName: null, items: [] };
-    try {
-      const raw = data.content[0].text.trim();
-      // Strip any markdown fences Claude might add
-      const cleaned = raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-      parsed = JSON.parse(cleaned);
-    } catch(e) {
-      console.warn('Claude JSON parse failed, falling back to keyword match', e);
-      document.getElementById('aiThinking').classList.remove('show');
-      parseWithKeywords(text);
-      return;
-    }
-    document.getElementById('aiThinking').classList.remove('show');
-    // Clean up customerName — Claude sometimes returns the string "null"
-    const cName = parsed.customerName && parsed.customerName !== 'null' ? parsed.customerName : null;
-    buildOrderFromParsed(cName, parsed.items || []);
-  } catch(err) {
-    document.getElementById('aiThinking').classList.remove('show');
-    toast('Claude error — using keyword match', 'error');
-    parseWithKeywords(text);
-  }
-}
 
 function parseWithKeywords(text) {
   if (!recipes || recipes.length === 0) {
@@ -2585,11 +2646,6 @@ function trackOrderStats(customerName, items) {
 
 // Wait for DOM + Firebase SDK to be fully ready
 function appInit() {
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    const inp = document.getElementById('apiKeyInput');
-    if (inp) inp.value = apiKey;
-    showApiConnected();
-  }
   // Load Firebase config if SDK is ready, otherwise wait for it
   if (typeof firebase !== 'undefined') {
     loadFirebaseConfig();
