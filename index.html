@@ -1586,6 +1586,7 @@ function clearCompletedToday() {
 // ──────────────────────────────────────────────
 function populateRecipeSelect() {
   const sel = document.getElementById('recipeSelect');
+  if (!sel) return;  // legacy select removed in favor of autocomplete inputs
   sel.innerHTML = '<option value="">— Select a recipe —</option>' +
     recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 }
