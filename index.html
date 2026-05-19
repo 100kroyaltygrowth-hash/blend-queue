@@ -1044,97 +1044,82 @@ function showPage(name, btn) {
 }
 
 // ──────────────────────────────────────────────
-// VOICE — tap-to-toggle recording → Netlify function (Whisper + Claude)
-// Falls back to Web Speech API if MediaRecorder or the function isn't
-// available (e.g. local file:// preview without netlify dev).
+// VOICE — tap-to-toggle Web Speech (browser STT) → Claude (server parsing)
+// Browser does the transcription; server only handles structured parsing,
+// so only ANTHROPIC_API_KEY is needed on Netlify.
+// If the server is unreachable, falls back to local keyword matching.
 // ──────────────────────────────────────────────
-let mediaRecorder = null;
-let audioChunks = [];
 let isRecording = false;
-let mediaStream = null;
+let _finalTranscript = '';
+let _interimTranscript = '';
 
 async function toggleRecording() {
   if (isRecording) {
-    // If the Web Speech fallback is running, stop it instead of MediaRecorder
-    if (recognition && (!mediaRecorder || mediaRecorder.state === 'inactive')) {
-      try { recognition.stop(); } catch {}
-      return;
-    }
-    stopRecording();
-  } else {
-    await startRecording();
+    if (recognition) { try { recognition.stop(); } catch {} }
+    return;
   }
+  startRecording();
 }
 
-async function startRecording() {
-  // Need MediaRecorder + getUserMedia for the high-quality path
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
-    toast('MediaRecorder unsupported — using browser speech recognition', '');
-    fallbackWebSpeechStart();
+function startRecording() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    toast('Speech recognition not supported in this browser — use Chrome, Edge, or iOS Safari', 'error');
     return;
   }
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (err) {
-    toast('Mic permission denied: ' + err.message, 'error');
-    return;
-  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  _finalTranscript = '';
+  _interimTranscript = '';
 
-  // Pick the first MIME type the browser supports
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
-  let mimeType = '';
-  for (const m of candidates) {
-    if (window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
-      mimeType = m; break;
-    }
-  }
-
-  try {
-    mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
-  } catch (err) {
-    mediaStream.getTracks().forEach(t => t.stop());
-    toast('Recorder failed to start: ' + err.message, 'error');
-    return;
-  }
-
-  audioChunks = [];
-  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
-  mediaRecorder.onstop = async () => {
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-    const blobType = mediaRecorder.mimeType || mimeType || 'audio/webm';
-    const blob = new Blob(audioChunks, { type: blobType });
-    audioChunks = [];
-    if (!blob.size) {
-      setMicIdle();
-      toast('No audio captured', 'error');
-      return;
-    }
-    await sendAudioToBackend(blob);
+  recognition.onstart = () => {
+    isRecording = true;
+    const btn = document.getElementById('micBtn');
+    btn.classList.add('listening');
+    btn.textContent = '⏹';
+    const status = document.getElementById('micStatus');
+    status.textContent = '🔴 Recording… tap to stop';
+    status.className = 'mic-status active';
+    document.getElementById('voicePreview').classList.remove('show');
   };
 
-  mediaRecorder.start();
-  isRecording = true;
-  const btn = document.getElementById('micBtn');
-  btn.classList.add('listening');
-  btn.textContent = '⏹';
-  const status = document.getElementById('micStatus');
-  status.textContent = '🔴 Recording… tap to stop';
-  status.className = 'mic-status active';
-  document.getElementById('voicePreview').classList.remove('show');
-}
+  recognition.onresult = e => {
+    _interimTranscript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) _finalTranscript += t + ' ';
+      else _interimTranscript += t;
+    }
+    const preview = document.getElementById('voicePreview');
+    preview.textContent = '"' + (_finalTranscript + _interimTranscript).trim() + '"';
+    preview.classList.add('show');
+  };
 
-function stopRecording() {
-  if (!mediaRecorder) { setMicIdle(); return; }
-  if (mediaRecorder.state !== 'inactive') {
-    try { mediaRecorder.stop(); } catch (e) { /* ignore */ }
+  recognition.onerror = e => {
+    if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      toast('Mic error: ' + e.error, 'error');
+    }
+    setMicIdle();
+  };
+
+  recognition.onend = async () => {
+    setMicIdle();
+    const text = (_finalTranscript + _interimTranscript).trim();
+    if (!text) {
+      toast('No speech detected', 'error');
+      return;
+    }
+    await sendTranscriptToBackend(text);
+  };
+
+  try {
+    recognition.start();
+  } catch (err) {
+    toast('Could not start recognizer: ' + err.message, 'error');
+    setMicIdle();
   }
-  isRecording = false;
-  const btn = document.getElementById('micBtn');
-  btn.classList.remove('listening');
-  btn.textContent = '🎙️';
-  const status = document.getElementById('micStatus');
-  status.textContent = 'Processing audio…';
-  status.className = 'mic-status active';
 }
 
 function setMicIdle() {
@@ -1143,136 +1128,52 @@ function setMicIdle() {
   if (btn) { btn.classList.remove('listening'); btn.textContent = '🎙️'; }
   const status = document.getElementById('micStatus');
   if (status) { status.textContent = 'Tap to start recording'; status.className = 'mic-status'; }
-  const ai = document.getElementById('aiThinking');
-  if (ai) ai.classList.remove('show');
 }
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const r = reader.result || '';
-      const comma = r.indexOf(',');
-      resolve(comma >= 0 ? r.slice(comma + 1) : r);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function sendAudioToBackend(blob) {
+async function sendTranscriptToBackend(transcript) {
   const ai = document.getElementById('aiThinking');
   const aiLabel = document.getElementById('aiThinkingLabel');
-  if (aiLabel) aiLabel.textContent = 'Uploading audio…';
+  if (aiLabel) aiLabel.textContent = 'Parsing with Claude…';
   if (ai) ai.classList.add('show');
-
-  let base64;
-  try {
-    base64 = await blobToBase64(blob);
-  } catch (err) {
-    setMicIdle();
-    toast('Could not read audio: ' + err.message, 'error');
-    return;
-  }
-
-  if (aiLabel) aiLabel.textContent = 'Transcribing & parsing…';
 
   try {
     const res = await fetch('/.netlify/functions/voice-parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        audioBase64: base64,
-        mimeType: blob.type || 'audio/webm',
+        transcript,
         recipeNames: recipes.map(r => r.name).join(', ')
       })
     });
 
     if (!res.ok) {
-      let errBody = '';
-      try { errBody = await res.text(); } catch {}
-      console.warn('voice-parse error', res.status, errBody);
-      setMicIdle();
+      let detail = '';
+      try { detail = await res.text(); } catch {}
+      console.warn('voice-parse error', res.status, detail);
+      if (ai) ai.classList.remove('show');
       if (res.status === 404) {
-        toast('Voice server not deployed — falling back to browser speech', 'error');
-        fallbackWebSpeechFromBlob(blob);
-        return;
+        toast('Voice server not deployed — using local matcher', '');
+      } else {
+        toast('Voice server error (' + res.status + ') — using local matcher', 'error');
       }
-      toast('Voice server error (' + res.status + ') — try again', 'error');
+      parseWithKeywords(transcript);
       return;
     }
 
     const data = await res.json();
-    setMicIdle();
+    if (ai) ai.classList.remove('show');
 
     if (data.transcript) {
       const preview = document.getElementById('voicePreview');
       preview.textContent = '"' + data.transcript + '"';
       preview.classList.add('show');
     }
-
-    if (!data.transcript && !(data.items || []).length) {
-      toast('No speech detected', 'error');
-      openConfirmModal('', []);
-      return;
-    }
-
     buildOrderFromParsed(data.customerName, data.items || []);
   } catch (err) {
-    setMicIdle();
-    toast('Network error: ' + err.message, 'error');
+    if (ai) ai.classList.remove('show');
+    toast('Network error — using local matcher: ' + err.message, 'error');
+    parseWithKeywords(transcript);
   }
-}
-
-// ── Fallback: Web Speech API (used only if MediaRecorder is missing
-//    or the Netlify function is unavailable). Same tap-to-toggle UX.
-function fallbackWebSpeechStart() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('Speech recognition unavailable in this browser', 'error'); return; }
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
-  let finalText = '';
-  recognition.onstart = () => {
-    isRecording = true;
-    document.getElementById('micBtn').classList.add('listening');
-    document.getElementById('micBtn').textContent = '⏹';
-    document.getElementById('micStatus').textContent = '🔴 Recording (browser)… tap to stop';
-    document.getElementById('micStatus').className = 'mic-status active';
-    document.getElementById('voicePreview').classList.remove('show');
-  };
-  recognition.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t + ' ';
-      else interim += t;
-    }
-    const preview = document.getElementById('voicePreview');
-    preview.textContent = '"' + (finalText + interim).trim() + '"';
-    preview.classList.add('show');
-  };
-  recognition.onerror = e => { toast('Mic error: ' + e.error, 'error'); setMicIdle(); };
-  recognition.onend = () => {
-    isRecording = false;
-    setMicIdle();
-    const text = finalText.trim();
-    if (text) {
-      document.getElementById('aiThinking').classList.add('show');
-      const lbl = document.getElementById('aiThinkingLabel');
-      if (lbl) lbl.textContent = 'Matching recipes…';
-      parseWithKeywords(text);
-    }
-  };
-  recognition.start();
-}
-
-// Used if MediaRecorder captured fine but the netlify function 404s.
-// We can't re-feed the blob to Web Speech (different APIs), so just
-// nudge the user to talk again via the browser fallback.
-function fallbackWebSpeechFromBlob(_blob) {
-  toast('Tap mic again to use browser speech recognition', '');
 }
 
 

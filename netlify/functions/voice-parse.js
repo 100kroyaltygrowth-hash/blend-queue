@@ -1,10 +1,13 @@
 // Netlify Function: voice-parse
-// Accepts a base64-encoded audio blob, transcribes it with OpenAI Whisper,
-// then parses the transcript into a structured order with Claude.
+// Accepts a spoken-order transcript and parses it into a structured order
+// using Claude. Browser does transcription via Web Speech API; this function
+// just handles the LLM parsing so the Anthropic key stays on the server.
 //
-// Required env vars (Netlify dashboard → Site settings → Environment variables):
-//   OPENAI_API_KEY     (sk-...)
+// Required env var:
 //   ANTHROPIC_API_KEY  (sk-ant-...)
+//
+// Optional (enables server-side Whisper transcription if you ever want it):
+//   OPENAI_API_KEY     (sk-...)
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 const WHISPER_MODEL = 'whisper-1';
@@ -24,11 +27,11 @@ exports.handler = async (event) => {
     return json(405, { error: 'Method not allowed' });
   }
 
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!OPENAI_API_KEY || !ANTHROPIC_API_KEY) {
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (!ANTHROPIC_API_KEY) {
     return json(500, {
-      error: 'Server not configured. Set OPENAI_API_KEY and ANTHROPIC_API_KEY in Netlify env vars.'
+      error: 'Server not configured. Set ANTHROPIC_API_KEY in Netlify env vars.'
     });
   }
 
@@ -39,45 +42,48 @@ exports.handler = async (event) => {
     return json(400, { error: 'Invalid JSON body' });
   }
 
-  const { audioBase64, mimeType = 'audio/webm', recipeNames = '' } = payload;
-  if (!audioBase64) return json(400, { error: 'Missing audioBase64' });
+  const { transcript: providedTranscript, audioBase64, mimeType = 'audio/webm', recipeNames = '' } = payload;
+  let transcript = (providedTranscript || '').trim();
 
-  // ── Step 1: Whisper transcription ─────────────────────────────
-  let transcript = '';
-  try {
-    const audioBuffer = Buffer.from(audioBase64, 'base64');
-    const audioBlob = new Blob([audioBuffer], { type: mimeType });
-    const ext = mimeType.includes('mp4') ? 'mp4'
-              : mimeType.includes('ogg') ? 'ogg'
-              : mimeType.includes('wav') ? 'wav'
-              : 'webm';
-
-    const fd = new FormData();
-    fd.append('file', audioBlob, `audio.${ext}`);
-    fd.append('model', WHISPER_MODEL);
-    fd.append('language', 'en');
-
-    const whRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-      body: fd
-    });
-
-    if (!whRes.ok) {
-      const detail = await whRes.text();
-      return json(502, { error: 'Whisper transcription failed', detail });
+  // If no transcript was sent but audio was, run Whisper (only when OPENAI_API_KEY is configured).
+  if (!transcript && audioBase64) {
+    if (!OPENAI_API_KEY) {
+      return json(400, {
+        error: 'Audio uploaded but OPENAI_API_KEY is not configured. Send a `transcript` field instead, or set OPENAI_API_KEY.'
+      });
     }
-    const whJson = await whRes.json();
-    transcript = (whJson.text || '').trim();
-  } catch (err) {
-    return json(500, { error: 'Whisper error: ' + err.message });
+    try {
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      const audioBlob = new Blob([audioBuffer], { type: mimeType });
+      const ext = mimeType.includes('mp4') ? 'mp4'
+                : mimeType.includes('ogg') ? 'ogg'
+                : mimeType.includes('wav') ? 'wav'
+                : 'webm';
+      const fd = new FormData();
+      fd.append('file', audioBlob, `audio.${ext}`);
+      fd.append('model', WHISPER_MODEL);
+      fd.append('language', 'en');
+      const whRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+        body: fd
+      });
+      if (!whRes.ok) {
+        const detail = await whRes.text();
+        return json(502, { error: 'Whisper transcription failed', detail });
+      }
+      const whJson = await whRes.json();
+      transcript = (whJson.text || '').trim();
+    } catch (err) {
+      return json(500, { error: 'Whisper error: ' + err.message });
+    }
   }
 
   if (!transcript) {
-    return json(200, { transcript: '', customerName: null, items: [] });
+    return json(400, { error: 'Missing `transcript` (or `audioBase64` with OpenAI configured)' });
   }
 
-  // ── Step 2: Claude parsing ────────────────────────────────────
+  // ── Claude parsing ────────────────────────────────────────────
   const prompt = `You are an order parser for Blend nutrition cafe. Parse the spoken order and match items to the recipe list.
 
 Available recipes: ${recipeNames || '(no recipes provided — return items as the customer named them)'}
