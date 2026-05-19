@@ -682,7 +682,6 @@
         <button class="option-btn" onclick="selectConfirmOption('level','Loaded',this)">Loaded</button>
       </div>
     </div>
-    <button class="btn btn-ghost btn-sm" id="confirmAddBtn" onclick="confirmAddItem()" style="display:none;margin-bottom:14px;">+ Add to Order</button>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('confirmOrderModal')">Cancel</button>
@@ -731,7 +730,6 @@
         <button class="option-btn" onclick="selectEditOption('level','Loaded',this)">Loaded</button>
       </div>
     </div>
-    <button class="btn btn-ghost btn-sm" id="editAddBtn" onclick="editAddItem()" style="display:none;margin-bottom:14px;">+ Add to Order</button>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('editOrderModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditedOrder()">💾 Save Changes</button>
@@ -2099,17 +2097,14 @@ function renderOptionTag(item) {
 
 function openConfirmModal(customerName, items) {
   confirmItems = items.map(i => ({...i}));
-  // These elements may not exist in newer markup (legacy <select> was replaced
-  // by autocomplete inputs); guard each one.
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
   setVal('confirmCustomerName',
     (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '');
-  setVal('confirmAddRecipe', '');
   setVal('confirmRecipeSearch', '');
   hide('confirmSizeSelector');
   hide('confirmLevelSelector');
-  hide('confirmAddBtn');
+  acSelectedRecipe['confirmRecipeSearch'] = null;
   populateConfirmRecipeSelect();
   renderConfirmItems();
   openModal('confirmOrderModal');
@@ -2204,11 +2199,10 @@ function openEditOrder(orderId) {
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
   setVal('editCustomerName', order.customerName);
-  setVal('editAddRecipe', '');
   setVal('editRecipeSearch', '');
   hide('editSizeSelector');
   hide('editLevelSelector');
-  hide('editAddBtn');
+  acSelectedRecipe['editRecipeSearch'] = null;
   populateConfirmRecipeSelect();
   renderEditItems();
   openModal('editOrderModal');
