@@ -1271,9 +1271,15 @@ function parseWithKeywords(text) {
   console.log('Top matches:', scored.slice(0,5).map(s => `${s.recipe.name} (${s.score})`));
 
   // ── Select matches ──
-  // Take top match + any others within 40 points of it
+  // Default: only return the single best match. Confirm modal lets the
+  // user add more by hand. The previous "within 40 points" rule was too
+  // greedy and grabbed siblings that shared one filler word ("muffin").
+  // Only include a second match if it scores within 15 of the top AND
+  // the top score is high (>= 60), suggesting a real multi-item order.
   const topScore = scored[0]?.score || 0;
-  const matched  = scored.filter(s => s.score >= topScore - 40).slice(0, 5).map(s => s.recipe);
+  const matched = topScore >= 60
+    ? scored.filter(s => s.score >= topScore - 15).slice(0, 5).map(s => s.recipe)
+    : scored.slice(0, 1).map(s => s.recipe);
 
   // ── Build items with size/level ──
   const items = matched.map(r => {
@@ -2093,25 +2099,31 @@ function renderOptionTag(item) {
 
 function openConfirmModal(customerName, items) {
   confirmItems = items.map(i => ({...i}));
-  document.getElementById('confirmCustomerName').value = (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '';
-  document.getElementById('confirmAddRecipe').value = '';
-  document.getElementById('confirmSizeSelector').style.display = 'none';
-  document.getElementById('confirmLevelSelector').style.display = 'none';
-  document.getElementById('confirmAddBtn').style.display = 'none';
+  // These elements may not exist in newer markup (legacy <select> was replaced
+  // by autocomplete inputs); guard each one.
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  setVal('confirmCustomerName',
+    (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '');
+  setVal('confirmAddRecipe', '');
+  setVal('confirmRecipeSearch', '');
+  hide('confirmSizeSelector');
+  hide('confirmLevelSelector');
+  hide('confirmAddBtn');
   populateConfirmRecipeSelect();
   renderConfirmItems();
   openModal('confirmOrderModal');
 }
 
 function populateConfirmRecipeSelect() {
-  const sel = document.getElementById('confirmAddRecipe');
-  sel.innerHTML = '<option value="">+ Add another recipe</option>' +
-    recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-  const sel2 = document.getElementById('editAddRecipe');
-  if (sel2) {
-    sel2.innerHTML = '<option value="">+ Add another recipe</option>' +
+  const fill = (id) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;  // legacy select replaced by autocomplete input — skip
+    sel.innerHTML = '<option value="">+ Add another recipe</option>' +
       recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-  }
+  };
+  fill('confirmAddRecipe');
+  fill('editAddRecipe');
 }
 
 function renderConfirmItems() {
@@ -2189,11 +2201,14 @@ function openEditOrder(orderId) {
   if (!order) return;
   editOrderId = orderId;
   editItems   = order.items.map(i => ({...i}));
-  document.getElementById('editCustomerName').value = order.customerName;
-  document.getElementById('editAddRecipe').value = '';
-  document.getElementById('editSizeSelector').style.display  = 'none';
-  document.getElementById('editLevelSelector').style.display = 'none';
-  document.getElementById('editAddBtn').style.display = 'none';
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  setVal('editCustomerName', order.customerName);
+  setVal('editAddRecipe', '');
+  setVal('editRecipeSearch', '');
+  hide('editSizeSelector');
+  hide('editLevelSelector');
+  hide('editAddBtn');
   populateConfirmRecipeSelect();
   renderEditItems();
   openModal('editOrderModal');

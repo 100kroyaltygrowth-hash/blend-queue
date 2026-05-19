@@ -27,8 +27,8 @@ exports.handler = async (event) => {
     return json(405, { error: 'Method not allowed' });
   }
 
-  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  const ANTHROPIC_API_KEY = sanitizeHeader(process.env.ANTHROPIC_API_KEY);
+  const OPENAI_API_KEY = sanitizeHeader(process.env.OPENAI_API_KEY);
   if (!ANTHROPIC_API_KEY) {
     return json(500, {
       error: 'Server not configured. Set ANTHROPIC_API_KEY in Netlify env vars.'
@@ -151,6 +151,17 @@ Rules:
     return json(500, { transcript, error: 'Claude error: ' + err.message });
   }
 };
+
+// HTTP header values must be ASCII (ByteString). If a key was pasted into
+// Netlify with a stray smart-quote, NBSP, or other invisible non-ASCII
+// character, fetch() throws "Cannot convert argument to a ByteString".
+// Strip anything outside printable ASCII so a bad paste can't kill the
+// function. (A truly bad key will still fail at the Anthropic API with
+// 401, which is a much clearer error.)
+function sanitizeHeader(v) {
+  if (!v) return '';
+  return String(v).replace(/[^\x21-\x7E]/g, '').trim();
+}
 
 function json(statusCode, body) {
   return {
