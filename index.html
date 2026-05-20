@@ -1482,7 +1482,7 @@ function renderQueue() {
         <span class="check-icon">✅</span>
         <div style="flex:1">
           <div class="completed-name">#${o.number} — ${o.customerName}</div>
-          <div style="font-size:12px;color:var(--text-dim)"></div>
+          <div style="font-size:12px;color:var(--text-dim)">${(o.items||[]).map(itemLabel).join(', ')}</div>
         </div>
         <div class="completed-time">${formatTime(o.completedAt)}</div>
       </div>
@@ -1962,7 +1962,7 @@ function renderDashboard() {
       <span class="check-icon">✅</span>
       <div style="flex:1">
         <div class="completed-name">#${o.number} — ${o.customerName}</div>
-        <div style="font-size:12px;color:var(--text-dim)"></div>
+        <div style="font-size:12px;color:var(--text-dim)">${(o.items||[]).map(itemLabel).join(', ')}</div>
       </div>
       <div class="completed-time">${new Date(o.completedAt).toLocaleDateString()} ${formatTime(o.completedAt)}</div>
     </div>
