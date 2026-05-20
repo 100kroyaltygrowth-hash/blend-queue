@@ -89,17 +89,20 @@ exports.handler = async (event) => {
 Available recipes: ${recipeNames || '(no recipes provided — return items as the customer named them)'}
 
 Shakes come in sizes: 16oz, 24oz, 32oz (default 16oz if not mentioned).
-Teas come in levels: Sparked, Lit, Loaded (default Sparked if not mentioned).
+Teas come in levels: Sparked, Lit, Loaded, Caf-Free (default Sparked if not mentioned).
 
 Spoken order: "${transcript}"
 
 Respond ONLY with valid JSON (no markdown, no commentary):
-{"customerName": "Mary Perryman", "items": [{"name": "Exact Recipe Name", "size": "24oz", "level": "Loaded"}]}
+{"customerName": "Mary Perryman", "items": [{"name": "Exact Recipe Name", "size": "24oz", "level": "Loaded", "qty": 2}]}
 
 Rules:
 - customerName: the person's name if mentioned after "for", otherwise null (not the string "null")
 - size: only for shakes — "16oz", "24oz", or "32oz". null for teas.
-- level: only for teas — "Sparked", "Lit", or "Loaded". null for shakes.
+- level: only for teas — "Sparked", "Lit", "Loaded", or "Caf-Free". null for shakes.
+  Map "caffeine free", "no caffeine", "decaf" to "Caf-Free".
+- qty: integer quantity for that item (default 1). "two strawberry shakes" => qty 2.
+- If the same drink is ordered with different sizes/levels, return separate items.
 - Match recipe names as closely as possible to the available list. Prefer exact matches.`;
 
   try {
