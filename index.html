@@ -977,7 +977,10 @@ function initFirebase(cfg) {
     db.ref('recipes').on('value', snap => {
       const val = snap.val();
       if (val) {
-        recipes = Object.values(val);
+        // Use the Firebase key as the id when the record has none — older
+        // recipes were stored without an internal id field, which broke
+        // every action that matches by id (manual select, view, delete).
+        recipes = Object.entries(val).map(([key, r]) => ({ ...r, id: r.id || key }));
       } else {
         recipes = [];
         seedDefaultRecipes();
@@ -2332,13 +2335,20 @@ function renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId) {
 
   list.innerHTML = header + filtered.map(r =>
     `<div class="autocomplete-item"
-      data-id="${r.id}"
-      onmousedown="selectACRecipe('${r.id}','${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">
-      <span>${q ? highlightMatch(r.name, q) : r.name}</span>
-      <span class="ac-cat">${r.category}</span>
+      data-id="${escapeAttr(r.id)}"
+      onmousedown="selectACRecipe(this.getAttribute('data-id'),'${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">
+      <span>${q ? highlightMatch(r.name, q) : escapeHTML(r.name)}</span>
+      <span class="ac-cat">${escapeHTML(r.category)}</span>
     </div>`
   ).join('');
   list.classList.add('open');
+}
+
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeHTML(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function clearSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
@@ -2351,8 +2361,9 @@ function clearSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
 
 function highlightMatch(name, q) {
   const idx = name.toLowerCase().indexOf(q);
-  if (idx < 0) return name;
-  return name.slice(0,idx) + '<strong style="color:var(--orange);">' + name.slice(idx,idx+q.length) + '</strong>' + name.slice(idx+q.length);
+  if (idx < 0) return escapeHTML(name);
+  return escapeHTML(name.slice(0,idx)) + '<strong style="color:var(--orange);">' +
+    escapeHTML(name.slice(idx,idx+q.length)) + '</strong>' + escapeHTML(name.slice(idx+q.length));
 }
 
 function selectACRecipe(recipeId, inputId, listId, sizeSelectorId, levelSelectorId) {
