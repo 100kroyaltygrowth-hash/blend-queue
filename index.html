@@ -296,6 +296,12 @@
   .tag-level-sparked { background:rgba(76,175,110,0.15); border:1px solid #3a8a50; color:#4caf6e; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
   .tag-level-lit     { background:rgba(240,180,41,0.15); border:1px solid #a07010; color:#f0b429; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
   .tag-level-loaded  { background:rgba(224,80,80,0.15); border:1px solid #a03030; color:#e05050; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
+  .tag-level-caf-free { background:rgba(96,165,230,0.15); border:1px solid #3a6aa0; color:#60a5e6; font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; padding:2px 10px; border-radius:20px; }
+  .tag-qty { background:var(--surface3); border:1px solid var(--orange-dim); color:var(--orange); font-size:11px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; padding:2px 9px; border-radius:20px; }
+  .qty-stepper { display:flex; align-items:center; gap:0; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .qty-stepper button { background:var(--surface3); border:none; color:var(--cream); width:26px; height:28px; font-size:16px; cursor:pointer; line-height:1; transition:background 0.15s; }
+  .qty-stepper button:hover { background:var(--orange-dim); color:#fff; }
+  .qty-stepper .qty-val { min-width:26px; text-align:center; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px; color:var(--cream); }
 </style>
 </head>
 <body>
@@ -313,10 +319,13 @@
     <button class="nav-tab" onclick="showPage('dashboard', this)">📊 Dashboard</button>
   </div>
   <div class="nav-right">
-    <div class="fb-status">
+    <button class="fb-status" id="fbStatusBtn" onclick="reopenFirebaseSetup()" type="button"
+      style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;"
+      title="Click to edit Firebase config">
       <div class="fb-dot pending" id="fbDot"></div>
       <span id="fbLabel">No DB</span>
-    </div>
+      <span style="font-size:10px;color:var(--text-dim);">⚙️</span>
+    </button>
   </div>
 </nav>
 
@@ -359,39 +368,15 @@
     <span style="font-size:12px;color:var(--text-dim);margin-left:12px;">Saved to your browser — enter once per device</span>
   </div>
 
-  <!-- CLAUDE API KEY -->
-  <div class="api-config" id="apiConfig">
-    <div id="apiConnectedBar" style="display:none;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:18px;">🤖</span>
-        <div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--green);">✅ Claude AI Connected</div>
-          <div style="font-size:12px;color:var(--text-dim);">Voice parsing enabled</div>
-        </div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="showApiInput()">Edit Key</button>
-    </div>
-    <div id="apiInputBar">
-      <div class="api-config-title">🤖 Claude AI — Voice Parsing</div>
-      <div class="api-row">
-        <input type="password" class="form-input" id="apiKeyInput" placeholder="sk-ant-...">
-        <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Save</button>
-      </div>
-      <div class="api-status" id="apiStatus">No key — voice will use keyword matching</div>
-    </div>
-  </div>
-
   <!-- MIC -->
   <div class="mic-section">
-    <div class="mic-label">🎙️ Hold to Speak Order</div>
-    <button class="mic-btn" id="micBtn"
-      onmousedown="startListening()" onmouseup="stopListening()"
-      ontouchstart="startListening(event)" ontouchend="stopListening()">🎙️</button>
-    <div class="mic-status" id="micStatus">Hold button to record</div>
+    <div class="mic-label">🎙️ Tap to Speak Order</div>
+    <button class="mic-btn" id="micBtn" type="button" onclick="toggleRecording()">🎙️</button>
+    <div class="mic-status" id="micStatus">Tap to start recording</div>
     <div class="voice-preview" id="voicePreview"></div>
     <div class="ai-thinking" id="aiThinking">
       <div class="spinner"></div>
-      <span>Claude is parsing your order...</span>
+      <span id="aiThinkingLabel">Transcribing & parsing your order…</span>
     </div>
   </div>
 
@@ -436,6 +421,7 @@
       <button class="option-btn selected" onclick="selectOption('level','Sparked',this)">Sparked</button>
       <button class="option-btn" onclick="selectOption('level','Lit',this)">Lit</button>
       <button class="option-btn" onclick="selectOption('level','Loaded',this)">Loaded</button>
+      <button class="option-btn" onclick="selectOption('level','Caf-Free',this)">Caf-Free</button>
     </div>
   </div>
 
@@ -517,6 +503,7 @@
       <button class="option-btn selected" onclick="selectQuickOption('level','Sparked',this)">Sparked</button>
       <button class="option-btn" onclick="selectQuickOption('level','Lit',this)">Lit</button>
       <button class="option-btn" onclick="selectQuickOption('level','Loaded',this)">Loaded</button>
+      <button class="option-btn" onclick="selectQuickOption('level','Caf-Free',this)">Caf-Free</button>
     </div>
   </div>
 
@@ -531,7 +518,13 @@
   <div class="section-header">
     <div class="section-title">Kitchen <span>Queue</span></div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <div class="fb-status"><div class="fb-dot pending" id="fbDot2"></div><span id="fbLabel2">—</span></div>
+      <button class="fb-status" onclick="reopenFirebaseSetup()" type="button"
+        style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;"
+        title="Click to edit Firebase config">
+        <div class="fb-dot pending" id="fbDot2"></div>
+        <span id="fbLabel2">—</span>
+        <span style="font-size:10px;color:var(--text-dim);">⚙️</span>
+      </button>
     </div>
   </div>
 
@@ -695,9 +688,9 @@
         <button class="option-btn selected" onclick="selectConfirmOption('level','Sparked',this)">Sparked</button>
         <button class="option-btn" onclick="selectConfirmOption('level','Lit',this)">Lit</button>
         <button class="option-btn" onclick="selectConfirmOption('level','Loaded',this)">Loaded</button>
+        <button class="option-btn" onclick="selectConfirmOption('level','Caf-Free',this)">Caf-Free</button>
       </div>
     </div>
-    <button class="btn btn-ghost btn-sm" id="confirmAddBtn" onclick="confirmAddItem()" style="display:none;margin-bottom:14px;">+ Add to Order</button>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('confirmOrderModal')">Cancel</button>
@@ -744,9 +737,9 @@
         <button class="option-btn selected" onclick="selectEditOption('level','Sparked',this)">Sparked</button>
         <button class="option-btn" onclick="selectEditOption('level','Lit',this)">Lit</button>
         <button class="option-btn" onclick="selectEditOption('level','Loaded',this)">Loaded</button>
+        <button class="option-btn" onclick="selectEditOption('level','Caf-Free',this)">Caf-Free</button>
       </div>
     </div>
-    <button class="btn btn-ghost btn-sm" id="editAddBtn" onclick="editAddItem()" style="display:none;margin-bottom:14px;">+ Add to Order</button>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('editOrderModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditedOrder()">💾 Save Changes</button>
@@ -852,10 +845,8 @@ let completedOrders = {};   // Firebase snapshot
 let customerDB      = [];   // Firebase customer records
 let manualOrderItems = [];
 let currentViewRecipeId = null;
-let apiKey        = localStorage.getItem('blendApiKey') || '';
 let orderCounter  = parseInt(localStorage.getItem('blendOrderCounter') || '1');
-let recognition   = null;
-let isListening   = false;
+let recognition   = null;  // Used by Web Speech fallback only
 let db            = null;  // Firebase db reference
 
 // ──────────────────────────────────────────────
@@ -923,6 +914,33 @@ function saveFirebaseConfig() {
   doInit();
 }
 
+// Re-open the Firebase setup card from the status dot.
+// Pre-fills the inputs with whatever's currently saved so the user
+// can edit one field instead of re-typing the whole config.
+function reopenFirebaseSetup() {
+  const saved = localStorage.getItem(FB_CONFIG_KEY);
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      set('fbApiKey',      cfg.apiKey);
+      set('fbAuthDomain',  cfg.authDomain);
+      set('fbDatabaseURL', cfg.databaseURL);
+      set('fbProjectId',   cfg.projectId);
+    } catch {}
+  }
+  const card = document.getElementById('firebaseSetup');
+  if (card) {
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  // Make sure the Voice page is visible (the card lives there)
+  const voiceTab = document.querySelector('.nav-tab');
+  if (voiceTab && !document.getElementById('page-order').classList.contains('active')) {
+    showPage('order', voiceTab);
+  }
+}
+
 function initFirebase(cfg) {
   try {
     if (typeof firebase === 'undefined') {
@@ -969,7 +987,10 @@ function initFirebase(cfg) {
     db.ref('recipes').on('value', snap => {
       const val = snap.val();
       if (val) {
-        recipes = Object.values(val);
+        // Use the Firebase key as the id when the record has none — older
+        // recipes were stored without an internal id field, which broke
+        // every action that matches by id (manual select, view, delete).
+        recipes = Object.entries(val).map(([key, r]) => ({ ...r, id: r.id || key }));
       } else {
         recipes = [];
         seedDefaultRecipes();
@@ -1034,150 +1055,138 @@ function showPage(name, btn) {
 }
 
 // ──────────────────────────────────────────────
-// CLAUDE API KEY
+// VOICE — tap-to-toggle Web Speech (browser STT) → Claude (server parsing)
+// Browser does the transcription; server only handles structured parsing,
+// so only ANTHROPIC_API_KEY is needed on Netlify.
+// If the server is unreachable, falls back to local keyword matching.
 // ──────────────────────────────────────────────
-function saveApiKey() {
-  const input = document.getElementById('apiKeyInput');
-  if (!input) return;
-  apiKey = input.value.trim();
-  localStorage.setItem('blendApiKey', apiKey);
-  const s = document.getElementById('apiStatus');
-  // Accept any sk-ant- key regardless of what follows
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    showApiConnected();
-    toast('Claude AI connected', 'success');
-  } else if (!apiKey) {
-    if (s) { s.textContent = 'No key entered'; s.className = 'api-status'; }
-  } else {
-    if (s) { s.textContent = 'Key format issue — should contain sk-ant-'; s.className = 'api-status'; }
+let isRecording = false;
+let _finalTranscript = '';
+let _interimTranscript = '';
+
+async function toggleRecording() {
+  if (isRecording) {
+    if (recognition) { try { recognition.stop(); } catch {} }
+    return;
   }
+  startRecording();
 }
 
-function showApiConnected() {
-  const bar = document.getElementById('apiConnectedBar');
-  const inp = document.getElementById('apiInputBar');
-  if (bar) bar.style.display = 'flex';
-  if (inp) inp.style.display = 'none';
-}
-
-function showApiInput() {
-  const bar = document.getElementById('apiConnectedBar');
-  const inp = document.getElementById('apiInputBar');
-  if (bar) bar.style.display = 'none';
-  if (inp) inp.style.display = 'block';
-}
-
-// ──────────────────────────────────────────────
-// VOICE
-// ──────────────────────────────────────────────
-function startListening(e) {
-  if (e) e.preventDefault();
+function startRecording() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('Speech recognition requires Chrome', 'error'); return; }
+  if (!SR) {
+    toast('Speech recognition not supported in this browser — use Chrome, Edge, or iOS Safari', 'error');
+    return;
+  }
   recognition = new SR();
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = 'en-US';
+  _finalTranscript = '';
+  _interimTranscript = '';
+
   recognition.onstart = () => {
-    isListening = true;
-    document.getElementById('micBtn').classList.add('listening');
-    document.getElementById('micStatus').textContent = '🔴 Listening...';
-    document.getElementById('micStatus').className = 'mic-status active';
+    isRecording = true;
+    const btn = document.getElementById('micBtn');
+    btn.classList.add('listening');
+    btn.textContent = '⏹';
+    const status = document.getElementById('micStatus');
+    status.textContent = '🔴 Recording… tap to stop';
+    status.className = 'mic-status active';
     document.getElementById('voicePreview').classList.remove('show');
   };
+
   recognition.onresult = e => {
-    const t = Array.from(e.results).map(r => r[0].transcript).join('');
-    window._lastVoiceTranscript = t;
-    document.getElementById('voicePreview').textContent = '"' + t + '"';
-    document.getElementById('voicePreview').classList.add('show');
+    _interimTranscript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) _finalTranscript += t + ' ';
+      else _interimTranscript += t;
+    }
+    const preview = document.getElementById('voicePreview');
+    preview.textContent = '"' + (_finalTranscript + _interimTranscript).trim() + '"';
+    preview.classList.add('show');
   };
-  recognition.onend = () => {
-    isListening = false;
-    document.getElementById('micBtn').classList.remove('listening');
-    document.getElementById('micStatus').textContent = 'Hold button to record';
-    document.getElementById('micStatus').className = 'mic-status';
-    // Use raw stored transcript to avoid quote-stripping bugs
-    const text = (window._lastVoiceTranscript || '').trim();
-    if (text) parseVoiceOrder(text);
-  };
+
   recognition.onerror = e => {
-    toast('Mic error: ' + e.error, 'error');
-    document.getElementById('micBtn').classList.remove('listening');
+    if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      toast('Mic error: ' + e.error, 'error');
+    }
+    setMicIdle();
   };
-  recognition.start();
-}
-function stopListening() {
-  if (recognition && isListening) recognition.stop();
-}
 
-async function parseVoiceOrder(text) {
-  document.getElementById('aiThinking').classList.add('show');
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    await parseWithClaude(text);
-  } else {
-    parseWithKeywords(text);
-  }
-}
-
-async function parseWithClaude(text) {
-  const recipeNames = recipes.map(r => r.name).join(', ');
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:500,
-        messages:[{
-          role:'user',
-          content:`You are an order parser for Blend nutrition cafe. Parse the spoken order and match items to the recipe list.
-
-Available recipes: ${recipeNames}
-
-Shakes come in sizes: 16oz, 24oz, 32oz (default 16oz if not mentioned).
-Teas come in levels: Sparked, Lit, Loaded (default Sparked if not mentioned).
-
-Spoken order: "${text}"
-
-Respond ONLY with valid JSON (no markdown):
-{"customerName": "Mary Perryman", "items": [{"name": "Exact Recipe Name", "size": "24oz", "level": "Loaded"}]}
-
-Rules:
-- customerName: the person's name if mentioned after "for", otherwise use null (not the string "null")
-- size: only for shakes — "16oz", "24oz", or "32oz". null for teas.
-- level: only for teas — "Sparked", "Lit", or "Loaded". null for shakes.
-- Match recipe names as closely as possible to the available list.`
-        }]
-      })
-    });
-    const data = await res.json();
-    let parsed = { customerName: null, items: [] };
-    try {
-      const raw = data.content[0].text.trim();
-      // Strip any markdown fences Claude might add
-      const cleaned = raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-      parsed = JSON.parse(cleaned);
-    } catch(e) {
-      console.warn('Claude JSON parse failed, falling back to keyword match', e);
-      document.getElementById('aiThinking').classList.remove('show');
-      parseWithKeywords(text);
+  recognition.onend = async () => {
+    setMicIdle();
+    const text = (_finalTranscript + _interimTranscript).trim();
+    if (!text) {
+      toast('No speech detected', 'error');
       return;
     }
-    document.getElementById('aiThinking').classList.remove('show');
-    // Clean up customerName — Claude sometimes returns the string "null"
-    const cName = parsed.customerName && parsed.customerName !== 'null' ? parsed.customerName : null;
-    buildOrderFromParsed(cName, parsed.items || []);
-  } catch(err) {
-    document.getElementById('aiThinking').classList.remove('show');
-    toast('Claude error — using keyword match', 'error');
-    parseWithKeywords(text);
+    await sendTranscriptToBackend(text);
+  };
+
+  try {
+    recognition.start();
+  } catch (err) {
+    toast('Could not start recognizer: ' + err.message, 'error');
+    setMicIdle();
   }
 }
+
+function setMicIdle() {
+  isRecording = false;
+  const btn = document.getElementById('micBtn');
+  if (btn) { btn.classList.remove('listening'); btn.textContent = '🎙️'; }
+  const status = document.getElementById('micStatus');
+  if (status) { status.textContent = 'Tap to start recording'; status.className = 'mic-status'; }
+}
+
+async function sendTranscriptToBackend(transcript) {
+  const ai = document.getElementById('aiThinking');
+  const aiLabel = document.getElementById('aiThinkingLabel');
+  if (aiLabel) aiLabel.textContent = 'Parsing with Claude…';
+  if (ai) ai.classList.add('show');
+
+  try {
+    const res = await fetch('/.netlify/functions/voice-parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transcript,
+        recipeNames: recipes.map(r => r.name).join(', ')
+      })
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try { detail = await res.text(); } catch {}
+      console.warn('voice-parse error', res.status, detail);
+      if (ai) ai.classList.remove('show');
+      if (res.status === 404) {
+        toast('Voice server not deployed — using local matcher', '');
+      } else {
+        toast('Voice server error (' + res.status + ') — using local matcher', 'error');
+      }
+      parseWithKeywords(transcript);
+      return;
+    }
+
+    const data = await res.json();
+    if (ai) ai.classList.remove('show');
+
+    if (data.transcript) {
+      const preview = document.getElementById('voicePreview');
+      preview.textContent = '"' + data.transcript + '"';
+      preview.classList.add('show');
+    }
+    buildOrderFromParsed(data.customerName, data.items || []);
+  } catch (err) {
+    if (ai) ai.classList.remove('show');
+    toast('Network error — using local matcher: ' + err.message, 'error');
+    parseWithKeywords(transcript);
+  }
+}
+
 
 function parseWithKeywords(text) {
   if (!recipes || recipes.length === 0) {
@@ -1230,7 +1239,9 @@ function parseWithKeywords(text) {
 
   // ── Extract tea level ──
   let detectedLevel = 'Sparked';
-  if (normalized.includes('loaded')) detectedLevel = 'Loaded';
+  if (normalized.includes('caffeine free') || normalized.includes('caf free') ||
+      normalized.includes('no caffeine') || normalized.includes('decaf')) detectedLevel = 'Caf-Free';
+  else if (normalized.includes('loaded')) detectedLevel = 'Loaded';
   else if (normalized.includes('lit')) detectedLevel = 'Lit';
 
   // ── Score every recipe ──
@@ -1273,13 +1284,19 @@ function parseWithKeywords(text) {
   console.log('Top matches:', scored.slice(0,5).map(s => `${s.recipe.name} (${s.score})`));
 
   // ── Select matches ──
-  // Take top match + any others within 40 points of it
+  // Default: only return the single best match. Confirm modal lets the
+  // user add more by hand. The previous "within 40 points" rule was too
+  // greedy and grabbed siblings that shared one filler word ("muffin").
+  // Only include a second match if it scores within 15 of the top AND
+  // the top score is high (>= 60), suggesting a real multi-item order.
   const topScore = scored[0]?.score || 0;
-  const matched  = scored.filter(s => s.score >= topScore - 40).slice(0, 5).map(s => s.recipe);
+  const matched = topScore >= 60
+    ? scored.filter(s => s.score >= topScore - 15).slice(0, 5).map(s => s.recipe)
+    : scored.slice(0, 1).map(s => s.recipe);
 
   // ── Build items with size/level ──
   const items = matched.map(r => {
-    const item = { name: r.name, id: r.id, category: r.category };
+    const item = { name: r.name, id: r.id, category: r.category, qty: 1 };
     if (r.category === 'shake') item.size  = detectedSize;
     if (r.category === 'tea')   item.level = detectedLevel;
     return item;
@@ -1332,10 +1349,12 @@ function buildOrderFromParsed(customerName, itemsRaw) {
 
     if (!r) return null;
 
-    const item = { id: r.id, name: r.name, category: r.category };
+    const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
     if (typeof raw === 'object') {
       if (raw.size  && r.category === 'shake') item.size  = raw.size;
       if (raw.level && r.category === 'tea')   item.level = raw.level;
+      const q = parseInt(raw.qty, 10);
+      if (!isNaN(q) && q > 0) item.qty = q;
     }
     if (r.category === 'shake' && !item.size)  item.size  = '16oz';
     if (r.category === 'tea'   && !item.level) item.level = 'Sparked';
@@ -1395,9 +1414,10 @@ function renderManualOrderItems() {
   document.getElementById('manualOrder').innerHTML = manualOrderItems.map(item => {
     const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
                    item.level ? `<span class="tag-level-${item.level.toLowerCase()}">${item.level}</span>` : '';
+    const qtyTag = (item.qty && item.qty > 1) ? `<span class="tag-qty">×${item.qty}</span>` : '';
     return `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;">
-      <span>${item.name}</span>${optTag}
-      <span onclick="removeManualItem('${item.id}')" style="cursor:pointer;color:var(--text-dim);font-size:16px;margin-left:2px;">×</span>
+      <span>${escapeHTML(item.name)}</span>${qtyTag}${optTag}
+      <span onclick="removeManualItem('${escapeAttr(item.id)}')" style="cursor:pointer;color:var(--text-dim);font-size:16px;margin-left:2px;">×</span>
     </div>`;
   }).join('');
 }
@@ -1441,8 +1461,9 @@ function renderQueue() {
             const r = recipes.find(r => r.id === item.id);
             const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
                            item.level ? `<span class="tag-level-${(item.level||'').toLowerCase()}">${item.level}</span>` : '';
-            if (!r) return '<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title">' + item.name + ' ' + (optTag||'') + '</div><div style="font-size:12px;color:var(--text-dim);">Recipe not found in library</div></div>';
-            return `<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title" style="display:flex;align-items:center;gap:8px;">${r.name} ${optTag}</div><div class="ingredient-list">${(r.ingredients||[]).map(i => '<span class="ingredient">' + i + '</span>').join('')}</div>${r.instructions ? '<div class="recipe-step">' + r.instructions + '</div>' : ''}</div>`;
+            const qtyTag = (item.qty && item.qty > 1) ? `<span class="tag-qty">×${item.qty}</span>` : '';
+            if (!r) return '<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title" style="display:flex;align-items:center;gap:8px;">' + escapeHTML(item.name) + ' ' + qtyTag + ' ' + (optTag||'') + '</div><div style="font-size:12px;color:var(--text-dim);">Recipe not found in library</div></div>';
+            return `<div class="recipe-panel open" style="margin-top:10px;"><div class="recipe-panel-title" style="display:flex;align-items:center;gap:8px;">${escapeHTML(r.name)} ${qtyTag} ${optTag}</div><div class="ingredient-list">${(r.ingredients||[]).map(i => '<span class="ingredient">' + escapeHTML(i) + '</span>').join('')}</div>${r.instructions ? '<div class="recipe-step">' + escapeHTML(r.instructions) + '</div>' : ''}</div>`;
           }).join('')}
         </div>
         <div class="queue-actions">
@@ -1461,7 +1482,7 @@ function renderQueue() {
         <span class="check-icon">✅</span>
         <div style="flex:1">
           <div class="completed-name">#${o.number} — ${o.customerName}</div>
-          <div style="font-size:12px;color:var(--text-dim)">${o.items.map(i=>i.name).join(', ')}</div>
+          <div style="font-size:12px;color:var(--text-dim)">${(o.items||[]).map(itemLabel).join(', ')}</div>
         </div>
         <div class="completed-time">${formatTime(o.completedAt)}</div>
       </div>
@@ -1525,6 +1546,7 @@ function clearCompletedToday() {
 // ──────────────────────────────────────────────
 function populateRecipeSelect() {
   const sel = document.getElementById('recipeSelect');
+  if (!sel) return;  // legacy select removed in favor of autocomplete inputs
   sel.innerHTML = '<option value="">— Select a recipe —</option>' +
     recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 }
@@ -1580,10 +1602,11 @@ function viewRecipe(id) {
 function addRecipeToManualOrder(id) {
   const r = recipes.find(r => r.id === id);
   if (!r) return;
-  if (!manualOrderItems.find(i => i.id === id)) {
-    manualOrderItems.push({ id: r.id, name: r.name });
-    renderManualOrderItems();
-  }
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
+  if (r.category === 'shake') item.size  = '16oz';
+  if (r.category === 'tea')   item.level = 'Sparked';
+  addOrBumpItem(manualOrderItems, item);
+  renderManualOrderItems();
   closeModal('viewRecipeModal');
   showPage('order', document.querySelector('.nav-tab'));
   toast(`${r.name} added to order`);
@@ -1939,7 +1962,7 @@ function renderDashboard() {
       <span class="check-icon">✅</span>
       <div style="flex:1">
         <div class="completed-name">#${o.number} — ${o.customerName}</div>
-        <div style="font-size:12px;color:var(--text-dim)">${o.items.map(i=>i.name).join(', ')}</div>
+        <div style="font-size:12px;color:var(--text-dim)">${(o.items||[]).map(itemLabel).join(', ')}</div>
       </div>
       <div class="completed-time">${new Date(o.completedAt).toLocaleDateString()} ${formatTime(o.completedAt)}</div>
     </div>
@@ -1981,7 +2004,7 @@ function exportOrders() {
   const all = [...Object.values(activeOrders), ...Object.values(completedOrders)];
   if (!all.length) { toast('No orders to export', 'error'); return; }
   const csv = ['#,Customer,Items,Created,Status',
-    ...all.map(o => `${o.number},"${o.customerName}","${o.items.map(i=>i.name).join('; ')}",${o.createdAt},${o.completedAt ? 'Completed' : 'Active'}`)
+    ...all.map(o => `${o.number},"${o.customerName}","${o.items.map(itemLabel).join('; ')}",${o.createdAt},${o.completedAt ? 'Completed' : 'Active'}`)
   ].join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
@@ -2002,6 +2025,15 @@ function updateQueueBadge() {
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+// "Strawberry Shake ×2 (24oz)" style label for compact item lists.
+function itemLabel(i) {
+  let s = i.name;
+  if (i.qty && i.qty > 1) s += ' ×' + i.qty;
+  const opt = i.size || i.level;
+  if (opt) s += ' (' + opt + ')';
+  return s;
 }
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
@@ -2094,51 +2126,73 @@ function renderOptionTag(item) {
 
 function openConfirmModal(customerName, items) {
   confirmItems = items.map(i => ({...i}));
-  document.getElementById('confirmCustomerName').value = (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '';
-  document.getElementById('confirmAddRecipe').value = '';
-  document.getElementById('confirmSizeSelector').style.display = 'none';
-  document.getElementById('confirmLevelSelector').style.display = 'none';
-  document.getElementById('confirmAddBtn').style.display = 'none';
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  setVal('confirmCustomerName',
+    (customerName && customerName !== 'Guest' && customerName !== 'null') ? customerName : '');
+  setVal('confirmRecipeSearch', '');
+  hide('confirmSizeSelector');
+  hide('confirmLevelSelector');
+  acSelectedRecipe['confirmRecipeSearch'] = null;
   populateConfirmRecipeSelect();
   renderConfirmItems();
   openModal('confirmOrderModal');
 }
 
 function populateConfirmRecipeSelect() {
-  const sel = document.getElementById('confirmAddRecipe');
-  sel.innerHTML = '<option value="">+ Add another recipe</option>' +
-    recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-  const sel2 = document.getElementById('editAddRecipe');
-  if (sel2) {
-    sel2.innerHTML = '<option value="">+ Add another recipe</option>' +
+  const fill = (id) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;  // legacy select replaced by autocomplete input — skip
+    sel.innerHTML = '<option value="">+ Add another recipe</option>' +
       recipes.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-  }
+  };
+  fill('confirmAddRecipe');
+  fill('editAddRecipe');
+}
+
+function levelSelect(item, onchange) {
+  const opts = ['Sparked','Lit','Loaded','Caf-Free'];
+  return `<select class="form-input" style="padding:4px 8px;font-size:12px;width:96px;" onchange="${onchange}">
+    ${opts.map(o => `<option ${item.level===o?'selected':''}>${o}</option>`).join('')}
+  </select>`;
+}
+function sizeSelect(item, onchange) {
+  const opts = ['16oz','24oz','32oz'];
+  return `<select class="form-input" style="padding:4px 8px;font-size:12px;width:72px;" onchange="${onchange}">
+    ${opts.map(o => `<option ${item.size===o?'selected':''}>${o}</option>`).join('')}
+  </select>`;
+}
+function qtyStepper(scope, idx, qty) {
+  return `<div class="qty-stepper">
+    <button type="button" onclick="updateItemQty('${scope}',${idx},-1)">−</button>
+    <span class="qty-val">${qty || 1}</span>
+    <button type="button" onclick="updateItemQty('${scope}',${idx},1)">+</button>
+  </div>`;
 }
 
 function renderConfirmItems() {
   document.getElementById('confirmItemsList').innerHTML = confirmItems.map((item, idx) => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
-      <div style="display:flex;align-items:center;gap:8px;flex:1;">
-        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${escapeHTML(item.name)}</span>
         ${renderOptionTag(item)}
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
-        ${item.category === 'shake' ? `
-          <select class="form-input" style="padding:4px 8px;font-size:12px;width:72px;" onchange="updateConfirmItemSize(${idx}, this.value)">
-            <option ${item.size==='16oz'?'selected':''}>16oz</option>
-            <option ${item.size==='24oz'?'selected':''}>24oz</option>
-            <option ${item.size==='32oz'?'selected':''}>32oz</option>
-          </select>` : ''}
-        ${item.category === 'tea' ? `
-          <select class="form-input" style="padding:4px 8px;font-size:12px;width:90px;" onchange="updateConfirmItemLevel(${idx}, this.value)">
-            <option ${item.level==='Sparked'?'selected':''}>Sparked</option>
-            <option ${item.level==='Lit'?'selected':''}>Lit</option>
-            <option ${item.level==='Loaded'?'selected':''}>Loaded</option>
-          </select>` : ''}
+        ${qtyStepper('confirm', idx, item.qty)}
+        ${item.category === 'shake' ? sizeSelect(item, `updateConfirmItemSize(${idx}, this.value)`) : ''}
+        ${item.category === 'tea' ? levelSelect(item, `updateConfirmItemLevel(${idx}, this.value)`) : ''}
         <button onclick="removeConfirmItem(${idx})" style="background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;line-height:1;">×</button>
       </div>
     </div>
   `).join('');
+}
+
+function updateItemQty(scope, idx, delta) {
+  const arr = scope === 'confirm' ? confirmItems : editItems;
+  if (!arr[idx]) return;
+  const next = (arr[idx].qty || 1) + delta;
+  arr[idx].qty = Math.max(1, next);
+  scope === 'confirm' ? renderConfirmItems() : renderEditItems();
 }
 
 function updateConfirmItemSize(idx, val)  { confirmItems[idx].size  = val; renderConfirmItems(); }
@@ -2160,10 +2214,10 @@ function selectConfirmOption(type, value, btn) {
 function confirmAddItem() {
   const r = acSelectedRecipe['confirmRecipeSearch'];
   if (!r) { toast('Select a recipe from the search list', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
   if (r.category === 'shake') item.size  = confirmSize;
   if (r.category === 'tea')   item.level = confirmLevel;
-  confirmItems.push(item);
+  addOrBumpItem(confirmItems, item);
   document.getElementById('confirmRecipeSearch').value = '';
   document.getElementById('confirmSizeSelector').style.display  = 'none';
   document.getElementById('confirmLevelSelector').style.display = 'none';
@@ -2190,11 +2244,13 @@ function openEditOrder(orderId) {
   if (!order) return;
   editOrderId = orderId;
   editItems   = order.items.map(i => ({...i}));
-  document.getElementById('editCustomerName').value = order.customerName;
-  document.getElementById('editAddRecipe').value = '';
-  document.getElementById('editSizeSelector').style.display  = 'none';
-  document.getElementById('editLevelSelector').style.display = 'none';
-  document.getElementById('editAddBtn').style.display = 'none';
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const hide   = (id)    => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  setVal('editCustomerName', order.customerName);
+  setVal('editRecipeSearch', '');
+  hide('editSizeSelector');
+  hide('editLevelSelector');
+  acSelectedRecipe['editRecipeSearch'] = null;
   populateConfirmRecipeSelect();
   renderEditItems();
   openModal('editOrderModal');
@@ -2203,23 +2259,14 @@ function openEditOrder(orderId) {
 function renderEditItems() {
   document.getElementById('editItemsList').innerHTML = editItems.map((item, idx) => `
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
-      <div style="display:flex;align-items:center;gap:8px;flex:1;">
-        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${item.name}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+        <span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:16px;color:var(--cream);">${escapeHTML(item.name)}</span>
         ${renderOptionTag(item)}
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
-        ${item.category === 'shake' ? `
-          <select class="form-input" style="padding:4px 8px;font-size:12px;width:72px;" onchange="updateEditItemSize(${idx}, this.value)">
-            <option ${item.size==='16oz'?'selected':''}>16oz</option>
-            <option ${item.size==='24oz'?'selected':''}>24oz</option>
-            <option ${item.size==='32oz'?'selected':''}>32oz</option>
-          </select>` : ''}
-        ${item.category === 'tea' ? `
-          <select class="form-input" style="padding:4px 8px;font-size:12px;width:90px;" onchange="updateEditItemLevel(${idx}, this.value)">
-            <option ${item.level==='Sparked'?'selected':''}>Sparked</option>
-            <option ${item.level==='Lit'?'selected':''}>Lit</option>
-            <option ${item.level==='Loaded'?'selected':''}>Loaded</option>
-          </select>` : ''}
+        ${qtyStepper('edit', idx, item.qty)}
+        ${item.category === 'shake' ? sizeSelect(item, `updateEditItemSize(${idx}, this.value)`) : ''}
+        ${item.category === 'tea' ? levelSelect(item, `updateEditItemLevel(${idx}, this.value)`) : ''}
         <button onclick="removeEditItem(${idx})" style="background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;line-height:1;">×</button>
       </div>
     </div>
@@ -2242,10 +2289,10 @@ function selectEditOption(type, value, btn) {
 function editAddItem() {
   const r = acSelectedRecipe['editRecipeSearch'];
   if (!r) { toast('Select a recipe from the search list', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
   if (r.category === 'shake') item.size  = editSize;
   if (r.category === 'tea')   item.level = editLevel;
-  editItems.push(item);
+  addOrBumpItem(editItems, item);
   document.getElementById('editRecipeSearch').value = '';
   document.getElementById('editSizeSelector').style.display  = 'none';
   document.getElementById('editLevelSelector').style.display = 'none';
@@ -2324,13 +2371,20 @@ function renderDropdown(q, inputId, listId, sizeSelectorId, levelSelectorId) {
 
   list.innerHTML = header + filtered.map(r =>
     `<div class="autocomplete-item"
-      data-id="${r.id}"
-      onmousedown="selectACRecipe('${r.id}','${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">
-      <span>${q ? highlightMatch(r.name, q) : r.name}</span>
-      <span class="ac-cat">${r.category}</span>
+      data-id="${escapeAttr(r.id)}"
+      onmousedown="selectACRecipe(this.getAttribute('data-id'),'${inputId}','${listId}','${sizeSelectorId}','${levelSelectorId}')">
+      <span>${q ? highlightMatch(r.name, q) : escapeHTML(r.name)}</span>
+      <span class="ac-cat">${escapeHTML(r.category)}</span>
     </div>`
   ).join('');
   list.classList.add('open');
+}
+
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeHTML(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function clearSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
@@ -2343,8 +2397,9 @@ function clearSearch(inputId, listId, sizeSelectorId, levelSelectorId) {
 
 function highlightMatch(name, q) {
   const idx = name.toLowerCase().indexOf(q);
-  if (idx < 0) return name;
-  return name.slice(0,idx) + '<strong style="color:var(--orange);">' + name.slice(idx,idx+q.length) + '</strong>' + name.slice(idx+q.length);
+  if (idx < 0) return escapeHTML(name);
+  return escapeHTML(name.slice(0,idx)) + '<strong style="color:var(--orange);">' +
+    escapeHTML(name.slice(idx,idx+q.length)) + '</strong>' + escapeHTML(name.slice(idx+q.length));
 }
 
 function selectACRecipe(recipeId, inputId, listId, sizeSelectorId, levelSelectorId) {
@@ -2443,11 +2498,10 @@ function pickName(name, inputId, acId) {
 function addManualRecipe() {
   const r = acSelectedRecipe['recipeSearchInput'];
   if (!r) { toast('Select a recipe from the search results', 'error'); return; }
-  if (manualOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
   if (r.category === 'shake') item.size  = selectedSize;
   if (r.category === 'tea')   item.level = selectedLevel;
-  manualOrderItems.push(item);
+  addOrBumpItem(manualOrderItems, item);
   renderManualOrderItems();
   document.getElementById('recipeSearchInput').value = '';
   document.getElementById('sizeSelector').style.display  = 'none';
@@ -2474,11 +2528,10 @@ function selectQuickOption(type, value, btn) {
 function addQuickRecipe() {
   const r = acSelectedRecipe['quickRecipeSearch'];
   if (!r) { toast('Select a recipe from the search results', 'error'); return; }
-  if (quickOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
   if (r.category === 'shake') item.size  = quickSize;
   if (r.category === 'tea')   item.level = quickLevel;
-  quickOrderItems.push(item);
+  addOrBumpItem(quickOrderItems, item);
   renderQuickOrderItems();
   document.getElementById('quickRecipeSearch').value = '';
   document.getElementById('quickSizeSelector').style.display  = 'none';
@@ -2486,12 +2539,26 @@ function addQuickRecipe() {
   acSelectedRecipe['quickRecipeSearch'] = null;
 }
 
+// Add an item, or bump its quantity if the same recipe+size+level is
+// already in the list. Returns the resulting item.
+function addOrBumpItem(arr, item) {
+  const match = arr.find(i =>
+    i.id === item.id && (i.size||'') === (item.size||'') && (i.level||'') === (item.level||''));
+  if (match) {
+    match.qty = (match.qty || 1) + (item.qty || 1);
+    return match;
+  }
+  arr.push(item);
+  return item;
+}
+
 function renderQuickOrderItems() {
   document.getElementById('quickOrder').innerHTML = quickOrderItems.map((item, idx) => {
     const optTag = item.size  ? `<span class="tag-size">${item.size}</span>` :
                    item.level ? `<span class="tag-level-${item.level.toLowerCase()}">${item.level}</span>` : '';
+    const qtyTag = (item.qty && item.qty > 1) ? `<span class="tag-qty">×${item.qty}</span>` : '';
     return `<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;">
-      <span>${item.name}</span>${optTag}
+      <span>${escapeHTML(item.name)}</span>${qtyTag}${optTag}
       <span onclick="removeQuickItem(${idx})" style="cursor:pointer;color:var(--text-dim);font-size:16px;margin-left:2px;">×</span>
     </div>`;
   }).join('');
@@ -2513,7 +2580,7 @@ function renderQuickPage() {
   const bar = document.getElementById('lastOrderBar');
   if (lastOrder && lastOrder.items && lastOrder.items.length) {
     bar.style.display = 'flex';
-    document.getElementById('lastOrderItems').textContent = lastOrder.items.map(i => i.name).join(', ');
+    document.getElementById('lastOrderItems').textContent = lastOrder.items.map(itemLabel).join(', ');
   } else {
     bar.style.display = 'none';
   }
@@ -2548,14 +2615,12 @@ function renderQuickPage() {
 function quickTapRecipe(recipeId) {
   const r = recipes.find(r => r.id === recipeId);
   if (!r) return;
-  if (quickOrderItems.find(i => i.id === r.id)) { toast('Already in order', 'error'); return; }
-  const item = { id: r.id, name: r.name, category: r.category };
+  const item = { id: r.id, name: r.name, category: r.category, qty: 1 };
   if (r.category === 'shake') item.size  = '16oz';
   if (r.category === 'tea')   item.level = 'Sparked';
-  quickOrderItems.push(item);
+  const result = addOrBumpItem(quickOrderItems, item);
   renderQuickOrderItems();
-  // Show size/level in confirm modal where they can adjust
-  toast(`${r.name} added — adjust size/level in confirm`, '');
+  toast(result.qty > 1 ? `${r.name} ×${result.qty}` : `${r.name} added — adjust size/level in confirm`, '');
 }
 
 function repeatLastOrder() {
@@ -2585,11 +2650,6 @@ function trackOrderStats(customerName, items) {
 
 // Wait for DOM + Firebase SDK to be fully ready
 function appInit() {
-  if (apiKey && apiKey.includes('sk-ant-')) {
-    const inp = document.getElementById('apiKeyInput');
-    if (inp) inp.value = apiKey;
-    showApiConnected();
-  }
   // Load Firebase config if SDK is ready, otherwise wait for it
   if (typeof firebase !== 'undefined') {
     loadFirebaseConfig();
